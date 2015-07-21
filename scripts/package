@@ -1,0 +1,4 @@
+#!/bin/bash
+
+export MAVEN_OPTS="-Xmx4000m"; mvn package -DskipTests -Dmaven.test.skip=true
+

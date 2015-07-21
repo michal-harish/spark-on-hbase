@@ -1,0 +1,8 @@
+#!/bin/bash
+
+cd $SPARK_HOME
+
+ls -l
+
+#git checkout v${spark.version}
+#export MAVEN_OPTS="-Xmx1024m -XX:MaxPermSize=512m"; mvn clean install -Pyarn -Phive -Dhadoop.version=2.3.0 -Dscala-2.10 -DskipTests -Dmaven.test.skip=true

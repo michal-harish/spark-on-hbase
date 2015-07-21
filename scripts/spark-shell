@@ -1,0 +1,52 @@
+#!/bin/bash
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$DIR/default-spark-env"
+key="$1"
+
+source "$DIR/options"
+
+$SPARK_HOME/bin/spark-shell \
+    --master yarn-client \
+    --driver-memory $DRIVER \
+    --num-executors $WORKERS \
+    --executor-memory $MEMORY \
+    --executor-cores 1 \
+    --queue "prod" \
+    --name "dxp-terminal" \
+    --conf "spark.app.name=dxp-terminal" \
+    --conf "spark.yarn.jar=$SPARK_REMOTE_JAR" \
+    --conf "spark.akka.frameSize=300" \
+    --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
+    --conf "spark.kryo.registrator=net.imagini.dxp.spark.KryoRegistrator" \
+    --conf "spark.kryo.referenceTracking=false" \
+    --conf "spark.yarn.executor.memoryOverhead=$OVERHEAD" \
+    --conf "spark.storage.memoryFraction=0.4" \
+    --conf "spark.shuffle.memoryFraction=0.3" \
+    --conf "spark.shuffle.spill=true" \
+    --conf "spark.shuffle.manager=sort" \
+    --conf "spark.sql.shuffle.partitions=4096" \
+    --conf "spark.hadoop.validateOutputSpecs=false" \
+    --conf "spark.scheduler.minRegisteredResourcesRatio=1.0" \
+    --conf "spark.scheduler.maxRegisteredResourcesWaitingTime=30000" \
+    --conf "spark.executor.extraClassPath=/usr/lib/hbase/*:/usr/lib/hbase/lib/htrace-core-3.1.0-incubating.jar:/usr/lib/hbase/lib/guava-12.0.1.jar" \
+    --conf "spark.executor.extraLibraryPath=/usr/lib/hadoop/lib/native" \
+    --conf "spark.executorEnv.LD_PRELOAD=/opt/jprofiler/librebind.so" \
+    --conf "spark.executorEnv.REBIND_PORT=8849:0" \
+    --conf "spark.executor.extraJavaOptions=-verbose:gc -XX:+UseSerialGC -XX:+UseCompressedOops -XX:+UseCompressedStrings $EXTRAS" \
+    --conf "spark.driver.userClassPathFirst=true" \
+    --conf "spark.driver.extraJavaOptions=-XX:PermSize=256M -XX:MaxPermSize=512M" \
+    --conf "spark.executor.userClassPathFirst=true" \
+    --conf "spark.executorEnv.HBASE_CONF_DIR=$HBASE_CONF_DIR" \
+    --conf "spark.executorEnv.HADOOP_CONF_DIR=$HADOOP_CONF_DIR" \
+    --driver-class-path "/usr/lib/hbase/*:/usr/lib/hbase/lib/htrace-core-3.1.0-incubating.jar:/usr/lib/hbase/lib/guava-12.0.1.jar" \
+    --driver-library-path "/usr/lib/hadoop/lib/native" \
+    -i "$DIR/init.scala" \
+    --jars "spark-on-hbase-demo.jar"
+
+# Dynamic allocation requires external shuffle service
+#    --conf "spark.dynamicAllocation.enabled=true" \
+#    --conf "spark.dynamicAllocation.minExecutors=64" \
+#    --conf "spark.dynamicAllocation.maxExecutors=$WORKERS" \
+
+

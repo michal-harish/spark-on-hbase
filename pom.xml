@@ -108,6 +108,7 @@
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
+                <filtering>true</filtering>
             </resource>
         </resources>
         <plugins>
@@ -162,9 +163,6 @@
                     <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
                     <junitxml>.</junitxml>
                     <filereports>WDF TestSuite.txt</filereports>
-                    <jvmArgs>
-                        <jvmArg>-Xmx2536m</jvmArg>
-                    </jvmArgs>
                 </configuration>
                 <executions>
                     <execution>
@@ -199,7 +197,7 @@
                                 </filter>
                             </filters>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
-                            <finalName>spark-on-hbase</finalName>
+                            <finalName>spark-on-hbase-demo</finalName>
                             <transformers>
                                 <transformer
                                         implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">

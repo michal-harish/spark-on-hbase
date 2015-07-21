@@ -1,5 +1,6 @@
 # spark-on-hbase
-Spark optimised for scanning, joining and updating HBaseRdd
+* Spark optimised for scanning, joining and updating HBaseRdd
+* The master setup is for HBase API 1.1.0.1, Scala 2.10 and Spark 1.4.1 but it is possible to create branches for older APIs
 
 # features overview
 
@@ -10,9 +11,14 @@ Spark optimised for scanning, joining and updating HBaseRdd
 
 # quick start on YARN
 
-...
+    - cp default-spark-env.template default-spark-env ...modify env.variable to match your environment
+    - ./scripts/assemble.spark - this will clone spark into /usr/lib/spark, build assembly jar and put it into <hdfs path>
+    - ./scripts/build.demo - this will build a spark-on-hbase-demo.jar which can be run as a shell or a job - see below
+
+
 
 # configuration and scripts
 
 ...
+
 

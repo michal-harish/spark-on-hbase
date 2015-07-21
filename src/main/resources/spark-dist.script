@@ -1,0 +1,10 @@
+#!/bin/bash
+
+cp -f $TARGET/classes/spark.log4j.properties $SPARK_HOME/conf/log4j.properties
+
+cd $SPARK_HOME
+
+tar -czf ~/spark-${spark.version}.tar.gz ./
+
+ls ~/spark-${spark.version}.tar.gz
+

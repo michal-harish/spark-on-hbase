@@ -1,0 +1,2 @@
+#!/bin/bash
+export MAVEN_OPTS="-Xmx4000m"; mvn clean test

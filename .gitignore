@@ -1,2 +1,4 @@
+target
 .idea
 spark-hbase.iml
+scripts/default-spark-env

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+mvn resources:resources
+
+SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+TARGET="$( cd "$SCRIPTS/../target" && pwd )"
+
+cd "$TARGET"
+
+source "$SCRIPTS/default-spark-env"
+
+#source "./classes/$1.script"
+cat "./classes/$1.script"

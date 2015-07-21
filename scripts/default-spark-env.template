@@ -1,0 +1,18 @@
+#!/bin/bash
+# this file is meant to be sourced
+
+export SPARK_HOME=/Users/$USER/git/apache-spark
+export SPARK_REMOTE_JAR="hdfs:/vdna/dxp/spark-assembly-1.4.1-hadoop2.3.0.jar"
+export HADOOP_HOME=/usr/lib/hadoop-2.3.0-cdh5.0.0/
+export HADOOP_CONF_DIR=/opt/envs/stag/etc/hadoop/
+export HBASE_CONF_DIR=/etc/hbase/conf.stag/
+
+set -u
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+printf "Running %s\n" "${0}"
+printf -- " - %-20s: %s\n" HADOOP_CONF_DIR $HADOOP_CONF_DIR
+printf -- " - %-20s: %s\n" HADOOP_HOME $HADOOP_HOME
+printf -- " - %-20s: %s\n" SPARK_HOME $SPARK_HOME
+echo
+
