@@ -12,11 +12,12 @@
 
 
 
-# quick start on YARN
+# quick start running DEMO on YARN cluster
 
     - cp default-spark-env.template default-spark-env ...modify env.variable to match your environment
-    - ./scripts/assemble.spark - this will clone spark into /usr/lib/spark, build assembly jar and put it into <hdfs path>
-    - ./scripts/build.demo - this will build a spark-on-hbase-demo.jar which can be run as a shell or a job - see below
+    - ./scripts/build spark - this will clone spark into /usr/lib/spark, build assembly jar and put it into <hdfs path>
+    - ./scripts/build demo
+    - ./scripts/demo-spark-shell
 
 
 
