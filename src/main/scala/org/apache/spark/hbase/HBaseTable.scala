@@ -78,19 +78,19 @@ class HBaseTable(val hbaConf: Configuration,
   def rdd()(implicit context: SparkContext): RDD[(HKey, Result)] = new HBaseRdd(context, hbaConf, tableName)
 
   def rdd(cf: Array[Byte], maxStamp: Long)(implicit context: SparkContext): RDD[(HKey, Result)] = {
-    new HBaseRdd(context, hbaConf, tableName, HConstants.OLDEST_TIMESTAMP, maxStamp, cf)
+    new HBaseRdd(context, hbaConf, tableName, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf))
   }
 
   def rdd(columns: String*)(implicit context: SparkContext): RDD[(HKey, Result)] = {
-    new HBaseRdd(context, hbaConf, tableName, columns.map(Bytes.toBytes(_)): _*)
+    new HBaseRdd(context, hbaConf, tableName, columns: _*)
   }
 
   def rdd(keyIdSpace: Short, columns: String*)(implicit context: SparkContext): RDD[(HKey, Result)] = {
-    new HBaseRdd(context, hbaConf, tableName, keyIdSpace, columns.map(Bytes.toBytes(_)): _*)
+    new HBaseRdd(context, hbaConf, tableName, keyIdSpace, columns: _*)
   }
 
   def rdd(keyIdSpace: Short, cf: Array[Byte], maxStamp: Long)(implicit context: SparkContext): RDD[(HKey, Result)] = {
-    new HBaseRdd(context, hbaConf, tableName, keyIdSpace, HConstants.OLDEST_TIMESTAMP, maxStamp, cf)
+    new HBaseRdd(context, hbaConf, tableName, keyIdSpace, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf))
   }
 
 

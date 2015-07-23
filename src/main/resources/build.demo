@@ -1,0 +1,8 @@
+#!/bin/bash
+
+cp $TARGET/classes/spark-shell $SCRIPTS/demo-spark-shell
+
+echo $PROJECT
+
+cd $PROJECT
+export MAVEN_OPTS="-Xmx4000m"; mvn package -DskipTests -Dmaven.test.skip=true -Pdemo

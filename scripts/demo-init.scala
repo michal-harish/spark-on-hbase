@@ -2,8 +2,8 @@
  * this script is enetered with sc already defined
  */
 import scala.math._
-import org.apache.spark.hbase.DEMO
-import org.apache.spark.hbase.common._
+import org.apache.spark.hbase.demo.DEMO
+import org.apache.spark.hbase._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.storage.StorageLevel._
 

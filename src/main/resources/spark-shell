@@ -1,10 +1,11 @@
 #!/bin/bash
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source "$DIR/default-spark-env"
-key="$1"
+SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+TARGET="$( cd "$SCRIPTS/../target" && pwd )"
 
-source "$DIR/options"
+source "$SCRIPTS/default-spark-env"
+
+source "$SCRIPTS/options.bash"
 
 $SPARK_HOME/bin/spark-shell \
     --master yarn-client \
@@ -41,8 +42,8 @@ $SPARK_HOME/bin/spark-shell \
     --conf "spark.executorEnv.HADOOP_CONF_DIR=$HADOOP_CONF_DIR" \
     --driver-class-path "/usr/lib/hbase/*:/usr/lib/hbase/lib/htrace-core-3.1.0-incubating.jar:/usr/lib/hbase/lib/guava-12.0.1.jar" \
     --driver-library-path "/usr/lib/hadoop/lib/native" \
-    -i "$DIR/init.scala" \
-    --jars "spark-on-hbase-demo.jar"
+    -i "$SCRIPTS/${shell.init.script}" \
+    --jars "$TARGET/${main.jar}.jar"
 
 # Dynamic allocation requires external shuffle service
 #    --conf "spark.dynamicAllocation.enabled=true" \

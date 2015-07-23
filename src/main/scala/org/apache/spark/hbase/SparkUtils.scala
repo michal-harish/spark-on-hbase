@@ -25,7 +25,9 @@ trait SparkUtils {
       initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HADOOP_CONF_DIR")}")):_*)
       initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HBASE_CONF_DIR")}")):_*)
     } else fs.foreach { configFileStatus =>
-      config.addResource(configFileStatus.getPath)
+      if (configFileStatus.getPath.getName.endsWith("*.xml")) {
+        config.addResource(configFileStatus.getPath)
+      }
     }
     config
   }

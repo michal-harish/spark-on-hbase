@@ -1,4 +1,4 @@
-package net.imagini.dxp.testing
+package org.apache.spark.hbase.testing
 
 import org.apache.spark.streaming.dstream.DStream
 import org.apache.spark.streaming.StreamingContext
@@ -13,7 +13,7 @@ class TestSparkContext(config: SparkConf) extends SparkContext(config) {
     conf.set("spark.hadoop.validateOutputSpecs", "false")
     conf.set("spark.default.parallelism", s"${parallelism}")
     conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-    conf.set("spark.kryo.registrator", "net.imagini.dxp.spark.KryoRegistrator")
+    conf.set("spark.kryo.registrator", "org.apache.spark.hbase.demo.KryoRegistrator")
     conf.set("spark.kryo.referenceTracking", "false")
     conf.set("spark.driver.allowMultipleContexts", "true")
     conf
