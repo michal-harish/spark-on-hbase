@@ -37,6 +37,8 @@ public class ByteUtils {
 
     public static long parseLongRadix10(byte[] array, int offset, int limit) {
         long result = 0;
+        long sign = (array[offset] == '-') ? -1l : 1l;
+        if (sign < 0) offset ++;
         for (int i = offset; i <= limit; i++) {
             if (array[i] < 48 || array[i] > 57) {
                 throw new IllegalArgumentException("Invalid numeric character " + (char) array[i]);
@@ -44,7 +46,7 @@ public class ByteUtils {
             result *= 10;
             result += (array[i] - 48);
         }
-        return result;
+        return result * sign;
     }
 
     public static long parseLongRadix16(byte[] array, int offset, int limit) {

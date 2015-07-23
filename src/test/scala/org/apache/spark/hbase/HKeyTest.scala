@@ -4,7 +4,11 @@ import org.scalatest._
 
 class HKeyTest extends FlatSpec with Matchers {
 
-  //String Vids
+  HKeySpace.register(new HKeySpaceString("d"))
+  HKeySpace.register(new HKeySpaceLong("r"))
+  HKeySpace.register(new HKeySpaceUUID("x"))
+  HKeySpace.register(new HKeySpaceUUID("v"))
+
   val d = HKey("d", "2")
   val r = HKey("r", "1")
   Seq(d, r).sortWith(HKey.comparator) should be (Seq(r, d))
@@ -19,31 +23,31 @@ class HKeyTest extends FlatSpec with Matchers {
   d1.asString should be ("CESE9999")
 
   //UUID Vids
-  val v0 = HKey("vdna", "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
-  v0.bytes.mkString(",") should be("-8,29,79,-82,40,-31,-8,29,79,-82,125,-20,17,-48,-89,101,0,-96,-55,30,107,-10")
-  v0.toString should be ("f81d4fae-7dec-11d0-a765-00a0c91e6bf6:vdna")
+  val v0 = HKey("v", "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
+  v0.bytes.mkString(",") should be("-8,29,79,-82,0,118,-8,29,79,-82,125,-20,17,-48,-89,101,0,-96,-55,30,107,-10")
+  v0.toString should be ("f81d4fae-7dec-11d0-a765-00a0c91e6bf6:v")
   v0.asString should be ("f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
 
-  val v1 = HKey("vdna", "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
-  val v2 = HKey("vdna", "f81d4fae-7dec-11d0-a765-00a0c91e6bf7")
+  val v1 = HKey("v", "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
+  val v2 = HKey("v", "f81d4fae-7dec-11d0-a765-00a0c91e6bf7")
   val x3 = HKey("x", "f81d4fae-7dec-11d0-a765-00a0c91e6bf8")
   x3.toString should be ("f81d4fae-7dec-11d0-a765-00a0c91e6bf8:x")
   x3.asString should be ("f81d4fae-7dec-11d0-a765-00a0c91e6bf8")
 
   v0.compareTo(v1) should be(0)
   v0.compareTo(v2) should be < 0
-  x3.compareTo(v0) should be < 0
-  x3.compareTo(v2) should be < 0
+  x3.compareTo(v0) should be > 0
+  x3.compareTo(v2) should be > 0
 
   v0.equals(v1) should be(true)
   v0.hashCode should equal(v1.hashCode)
   v1.compareTo(v2) should be < 0
   v2.compareTo(v1) should be > 0
-  x3.compareTo(v1) should be < 0
+  x3.compareTo(v1) should be > 0
   v1.equals(v2) should be(false)
   v2.equals(v2) should be(true)
-  v2.keySpace should be(HKeySpace("vdna"))
-  x3.keySpace should not be (HKeySpace("vdna"))
+  v2.keySpace should be(HKeySpace("v"))
+  x3.keySpace should not be (HKeySpace("v"))
 
   val seq = Seq(v0, v1, v2, x3)
   val customComparatorSortedSeq = seq.sortWith(HKey.comparator)

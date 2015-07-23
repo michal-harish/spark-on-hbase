@@ -9,6 +9,9 @@ import org.scalatest.{FlatSpec, Matchers}
  */
 class RegionPartitionerTest extends FlatSpec with Matchers {
 
+  HKeySpace.register(new HKeySpaceUUID("test"))
+  HKeySpace.register(new HKeySpaceString("d"))
+
   val p1 = new RegionPartitioner(5)
   println(s"NUM REGIONS ${p1.numRegions}")
   p1.splitKeys.map(_.mkString("|")).foreach(println)
@@ -30,7 +33,7 @@ class RegionPartitionerTest extends FlatSpec with Matchers {
   val p = new RegionPartitioner(numRegions)
 
 
-  val v0 = HKey("vdna", "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
+  val v0 = HKey("test", "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
   val d0 = HKey("d", "CASEAS000000000")
   val d1 = HKey("d", "CASEASfffffffff")
 
@@ -52,7 +55,7 @@ class RegionPartitionerTest extends FlatSpec with Matchers {
   print("...")
   val t = System.currentTimeMillis()
   for(i <- (1 to n)) {
-    val vid = HKey(UUID.randomUUID.toString)
+    val vid = HKey("test", UUID.randomUUID.toString)
     val part = p.getPartition(vid)
     if (hist.contains(part)) hist += (part -> (hist(part) + 1)) else hist += (part -> 1)
   }

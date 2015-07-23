@@ -8,14 +8,14 @@ object HKeySpace {
 
   def apply(idSpace: String): Short = idSpace.hashCode.toShort
 
-  def apply(idSpace: Short): HKeySpace = mapping(idSpace)
+  def apply(idSpace: Short): HKeySpace = if (exists(idSpace)) mapping(idSpace) else throw new IllegalArgumentException
 
   def exists(idSpace: Short): Boolean = mapping.contains(idSpace)
 
-  val mapping = Map[Short, HKeySpace](
-    //TODO KeySpace.register(new KeySpaceUUID("example")
-  )
-  val symbols: Iterable[String] = mapping.values.map(_.symbol)
+  private val mapping = scala.collection.mutable.HashMap[Short, HKeySpace]()
+
+  def register(keySpace: HKeySpace) = mapping += (keySpace.i -> keySpace)
+
 }
 
 
@@ -58,15 +58,6 @@ class HKeySpaceUUIDNumeric(symbol: String)  extends HKeySpace(symbol) with KeySe
   }
 }
 
-class HKeySpaceUUIDNumericNoLeadZeros(symbol: String)  extends HKeySpace(symbol) with KeySerdeUUIDNumeric {
-  override def asString(bytes: Array[Byte]): String = uuidToNumericString(bytes, 6).dropWhile(_ == '0')
-  override def asBytes(id: String): Array[Byte] = {
-    val bytes = allocate(16)
-    stringToUUIDNumeric("00000000000000000000000000000000" + id takeRight 32, 0, bytes, 6)
-    ByteUtils.copy(bytes, 6, bytes, 0, 4)
-    bytes
-  }
-}
 
 
 class HKeySpaceString(symbol: String) extends HKeySpace(symbol) with KeySerdeString {
@@ -90,16 +81,6 @@ class HKeySpaceLong(symbol: String) extends HKeySpace(symbol) with KeySerdeLong 
   }
 }
 
-class HKeySpaceLongHash(symbol: String) extends HKeySpace(symbol) with KeySerdeLong {
-  override def asString(bytes: Array[Byte]): String = longBytesToString(bytes, 6)
-  override def asBytes(id: String): Array[Byte] = {
-    val bytes = allocate(8)
-    longStringToBytes(id, bytes, 6)
-    ByteUtils.putIntValue(id.hashCode, bytes, 0)
-    bytes
-  }
-}
-
 class HKeySpaceLongPositive(symbol: String) extends HKeySpace(symbol) with KeySerdeLongPositive {
   override def asString(bytes: Array[Byte]): String = longPositiveBytesToString(bytes, 6)
   override def asBytes(id: String): Array[Byte] = {
@@ -109,11 +90,6 @@ class HKeySpaceLongPositive(symbol: String) extends HKeySpace(symbol) with KeySe
     bytes
   }
 }
-
-class HKeySpaceEmailHash(symbol: String, val salt: String) extends HKeySpaceUUIDNumeric(symbol) {
-
-}
-
 
 trait KeySerdeUUID {
   val uuidPattern = "^(?i)[a-f0-9]{8}\\-[a-f0-9]{4}\\-[a-f0-9]{4}\\-[a-f0-9]{4}\\-[a-f0-9]{12}$".r.pattern
