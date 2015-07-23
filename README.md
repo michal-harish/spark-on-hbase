@@ -27,4 +27,6 @@ You can then use build script to build a demo application, which will package an
 
 You can then run the demo appliation as a shell:
 
-```./scripts/demo-spark-shell```
+`./scripts/demo-spark-shell`
+
+# ...
