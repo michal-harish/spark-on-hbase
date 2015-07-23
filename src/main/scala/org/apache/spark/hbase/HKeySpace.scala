@@ -30,7 +30,7 @@ abstract class HKeySpace(val symbol: String) {
 
   def allocate(length: Int): Array[Byte] = {
     val bytes = new Array[Byte](length + 6)
-    bytes(4) = (i >> 8).toByte
+    bytes(4) = (i >>> 8).toByte
     bytes(5) = (i).toByte
     bytes
   }

@@ -22,11 +22,14 @@ trait HBaseDescriptors  {
   def getRegionSplits(hbaseConf: Configuration, tableName: TableName) = {
     val connection = ConnectionFactory.createConnection(hbaseConf)
     val regionLocator = connection.getRegionLocator(tableName)
-    val keyRanges = regionLocator.getStartEndKeys
-    regionLocator.close
-    connection.close
-    keyRanges.getFirst.zipWithIndex.map { case (startKey, index) => {
-      (startKey, keyRanges.getSecond()(index))
-    }}
+    try {
+      val keyRanges = regionLocator.getStartEndKeys
+      keyRanges.getFirst.zipWithIndex.map { case (startKey, index) => {
+        (startKey, keyRanges.getSecond()(index))
+      }}
+    } finally {
+      regionLocator.close
+      connection.close
+    }
   }
 }

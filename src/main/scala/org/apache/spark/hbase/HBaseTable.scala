@@ -78,7 +78,7 @@ class HBaseTable(val hbaConf: Configuration,
   def rdd()(implicit context: SparkContext): RDD[(HKey, Result)] = new HBaseRdd(context, hbaConf, tableName)
 
   def rdd(cf: Array[Byte], maxStamp: Long)(implicit context: SparkContext): RDD[(HKey, Result)] = {
-    new HBaseRdd(context, hbaConf, tableName, HConstants.OLDEST_TIMESTAMP, maxStamp)
+    new HBaseRdd(context, hbaConf, tableName, HConstants.OLDEST_TIMESTAMP, maxStamp, cf)
   }
 
   def rdd(columns: String*)(implicit context: SparkContext): RDD[(HKey, Result)] = {
@@ -90,7 +90,7 @@ class HBaseTable(val hbaConf: Configuration,
   }
 
   def rdd(keyIdSpace: Short, cf: Array[Byte], maxStamp: Long)(implicit context: SparkContext): RDD[(HKey, Result)] = {
-    new HBaseRdd(context, hbaConf, tableName, keyIdSpace, HConstants.OLDEST_TIMESTAMP, maxStamp)
+    new HBaseRdd(context, hbaConf, tableName, keyIdSpace, HConstants.OLDEST_TIMESTAMP, maxStamp, cf)
   }
 
 

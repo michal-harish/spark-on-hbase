@@ -20,10 +20,10 @@ object DXPJobRunner extends App {
               val methodArgs = arg.split(" ")
               if (methodArgs.length == 1) {
                 val m = DEMO.getClass.getMethod(methodArgs(0))
-                DEMO.time(m.invoke(DEMO))
+                time(m.invoke(DEMO))
               } else {
                 val m = DEMO.getClass.getMethod(methodArgs(0), classOf[String])
-                DEMO.time(m.invoke(DEMO, methodArgs(1)))
+                time(m.invoke(DEMO, methodArgs(1)))
               }
             } catch {
               case e: NoSuchMethodException => println(s"method `${args(0)}` not defined in the DXPJobRunner")
@@ -43,5 +43,11 @@ object DXPJobRunner extends App {
     }
   }
 
+  def time[A](a: => A): A = {
+    val l = System.currentTimeMillis
+    val r = a
+    println((System.currentTimeMillis - l).toDouble / 1000)
+    r
+  }
 
 }

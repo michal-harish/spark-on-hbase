@@ -20,11 +20,8 @@ public class ByteUtils {
 
     public static int parseIntRadix10(byte[] array, int offset, int limit) {
         int result = 0;
-        boolean negative = false;
-        if (array[offset] == '-') {
-            negative = true;
-            offset++;
-        }
+        int sign = (array[offset] == '-') ? -1 : 1;
+        if (sign < 0) offset ++;
         for (int i = offset; i <= limit; i++) {
             if (array[i] < 48 || array[i] > 57) {
                 throw new IllegalArgumentException("Invalid numeric character " + (char) array[i]);
@@ -32,7 +29,7 @@ public class ByteUtils {
             result *= 10;
             result += (array[i] - 48);
         }
-        return negative ? -result : result;
+        return result * sign;
     }
 
     public static long parseLongRadix10(byte[] array, int offset, int limit) {

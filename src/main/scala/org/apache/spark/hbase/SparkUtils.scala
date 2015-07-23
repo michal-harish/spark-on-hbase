@@ -19,20 +19,15 @@ import scala.reflect.ClassTag
  */
 trait SparkUtils {
 
-
-  final def md5(input: Array[Byte]): Array[Byte] = MessageDigest.getInstance("MD5").digest(input)
-
-  val date = new SimpleDateFormat("yyyy-MM-dd")
-
-  def t(): Long = System.currentTimeMillis()
-
-  def t(formattedDate: String): Long = date.parse(formattedDate).getTime
-
-  def time[A](a: => A): A = {
-    val l = t()
-    val r = a
-    println((t() - l).toDouble / 1000);
-    r
+  final def initConfig[T <: Configuration](sc: SparkContext, config: T, fs: FileStatus*): T = {
+    if (fs.size == 0 ) {
+      val localFs: FileSystem = FileSystem.getLocal(config)
+      initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HADOOP_CONF_DIR")}")):_*)
+      initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HBASE_CONF_DIR")}")):_*)
+    } else fs.foreach { configFileStatus =>
+      config.addResource(configFileStatus.getPath)
+    }
+    config
   }
 
   def info(tag: String, rdd: RDD[_]): Unit = {
@@ -93,14 +88,4 @@ trait SparkUtils {
     })
   }
 
-  final def initConfig[T <: Configuration](sc: SparkContext, config: T, fs: FileStatus*): T = {
-    if (fs.size == 0 ) {
-      val localFs: FileSystem = FileSystem.getLocal(config)
-      initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HADOOP_CONF_DIR")}")):_*)
-      initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HBASE_CONF_DIR")}")):_*)
-    } else fs.foreach { configFileStatus =>
-      config.addResource(configFileStatus.getPath)
-    }
-    config
-  }
 }
