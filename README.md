@@ -11,18 +11,20 @@
 * __HBaseJoin__ - using HBase ordered properties and multiget functionality, this abstract function is provided with several variants for optimised joins
 
 
-
 # quick start running DEMO on YARN cluster
 
-    - cp default-spark-env.template default-spark-env ...modify env.variable to match your environment
-    - ./scripts/build spark - this will clone spark into /usr/lib/spark, build assembly jar and put it into <hdfs path>
-    - ./scripts/build demo
-    - ./scripts/demo-spark-shell
+First thing you'll need is a deafult-spark-env, there's a template you can copy and then modify to match your environment.
 
+```cp default-spark-env.template default-spark-env```
+    
+If you don't have your spark assembly jar ready on the driver or available in hdfs for executors, you'll first need to build it and put it on the driver and into hdfs:
 
+```./scripts/build spark```
+    
+You can then use build script to build a demo application, which will package and prepare start shell and submit scripts:
 
-# configuration and scripts
+```./scripts/build demo
 
-...
+You can then run the demo appliation as a shell:
 
-
+./scripts/demo-spark-shell```
