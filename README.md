@@ -15,7 +15,14 @@
 
 First thing you'll need is a deafult-spark-env, there's a template you can copy and then modify to match your environment.
 
-```cp default-spark-env.template default-spark-env```
+```cp scripts/default-spark-env.template scripts/default-spark-env```
+
+On the yarn nodes as well as driver, the following files should be distributed:
+`/usr/lib/hbase/lib` needs to contain all hbase java libraries required by the hbase client
+`/usr/lib/hbase/lib/native` needs to contain all required native libraries for compression algorithms etc.
+
+Further, on the driver you'll need the full spark distribution of version as defined in the pom.xml (1.4.1 in master) and on the path defined by `$SPARK_HOME/` in the spark-default-env
+NOTE: that the scripts predefined here for spark-shell and spark-submit define the spark master as yarn-client so the driver is the computer from which you are building the demo app.
     
 If you don't have your spark assembly jar ready on the driver or available in hdfs for executors, you'll first need to build it and put it on the driver and into hdfs:
 
