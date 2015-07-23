@@ -23,8 +23,8 @@ If you don't have your spark assembly jar ready on the driver or available in hd
     
 You can then use build script to build a demo application, which will package and prepare start shell and submit scripts:
 
-```./scripts/build demo
+```./scripts/build demo```
 
 You can then run the demo appliation as a shell:
 
-./scripts/demo-spark-shell```
+```./scripts/demo-spark-shell```
