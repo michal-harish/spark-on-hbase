@@ -1,35 +1,84 @@
 package org.apache.spark.hbase
 
 import java.io.ByteArrayOutputStream
-import java.security.MessageDigest
-import java.text.SimpleDateFormat
 
 import com.esotericsoftware.kryo.io.Input
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path, FileSystem}
+import org.apache.hadoop.hbase.TableName
+import org.apache.hadoop.hbase.client.ConnectionFactory
 import org.apache.hadoop.io.{BytesWritable, NullWritable}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
-
+import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 
 /**
  * Created by mharis on 17/06/15.
  */
-trait SparkUtils {
+trait Utils {
 
   final def initConfig[T <: Configuration](sc: SparkContext, config: T, fs: FileStatus*): T = {
-    if (fs.size == 0 ) {
+    if (fs.size == 0) {
       val localFs: FileSystem = FileSystem.getLocal(config)
-      initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HADOOP_CONF_DIR")}")):_*)
-      initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HBASE_CONF_DIR")}")):_*)
-    } else fs.foreach { configFileStatus =>
-      if (configFileStatus.getPath.getName.endsWith("*.xml")) {
+      initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HADOOP_CONF_DIR")}")): _*)
+      initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HBASE_CONF_DIR")}")): _*)
+    } else fs.foreach { configFileStatus => {
+      if (configFileStatus.getPath.getName.endsWith(".xml")) {
+        println("INITIALISING CONFIG " + configFileStatus.getPath)
         config.addResource(configFileStatus.getPath)
       }
     }
+    }
     config
+  }
+
+  def getTable(hbaseConf: Configuration, tableName: TableName): HBaseTable = {
+    val connection = ConnectionFactory.createConnection(hbaseConf)
+    try {
+      val admin = connection.getAdmin
+      try {
+        val regionLocator = connection.getRegionLocator(tableName)
+        try {
+          val numRegions = regionLocator.getStartKeys.length
+          val desc = admin.getTableDescriptor(tableName)
+          new HBaseTable(hbaseConf, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*)
+        } finally {
+          regionLocator.close
+        }
+      } finally {
+        admin.close
+      }
+    } finally {
+      connection.close
+    }
+  }
+
+  def getNumRegions(hbaseConf: Configuration, tableName: TableName) = {
+    val connection = ConnectionFactory.createConnection(hbaseConf)
+    val regionLocator = connection.getRegionLocator(tableName)
+    try {
+      regionLocator.getStartKeys.length
+    } finally {
+      regionLocator.close
+      connection.close
+    }
+  }
+
+  def getRegionSplits(hbaseConf: Configuration, tableName: TableName) = {
+    val connection = ConnectionFactory.createConnection(hbaseConf)
+    val regionLocator = connection.getRegionLocator(tableName)
+    try {
+      val keyRanges = regionLocator.getStartEndKeys
+      keyRanges.getFirst.zipWithIndex.map { case (startKey, index) => {
+        (startKey, keyRanges.getSecond()(index))
+      }
+      }
+    } finally {
+      regionLocator.close
+      connection.close
+    }
   }
 
   def info(tag: String, rdd: RDD[_]): Unit = {

@@ -92,7 +92,7 @@ class HE(val bytes: Array[Byte], val vendorCode: Short, val ts: Long) extends ja
 }
 
 
-trait HBAGraph extends AGraph[HE] with SparkUtils {
+trait HBaseGraph extends AGraph[HE] with Utils {
 
   type FEATURES = Map[String, Array[Byte]]
 
@@ -104,10 +104,10 @@ trait HBAGraph extends AGraph[HE] with SparkUtils {
   object HGraph extends HGraph("dxp-graph-v5", 1024)
 
   implicit var context: SparkContext = null
-  var config: Configuration = null
+  var hbaseConfig: Configuration = null
 
-  final def initHBase(context: SparkContext) = {
-    this.config = initConfig(context, HBaseConfiguration.create)
+  protected[hbase] final def initHBase(context: SparkContext) = {
+    this.hbaseConfig = initConfig(context, HBaseConfiguration.create)
     this.context = context
     HGraph.loadProperties
   }
@@ -151,7 +151,7 @@ trait HBAGraph extends AGraph[HE] with SparkUtils {
   }
 
   //FIXME liblz4.so not available in cdh5 distribution so using snappy for now
-  class HGraph(tableName: String, numberOfRegions: Int) extends HBaseTable(config, tableName: String, numberOfRegions
+  class HGraph(tableName: String, numberOfRegions: Int) extends HBaseTable(hbaseConfig, tableName: String, numberOfRegions
     , column(Bytes.toBytes("N"), true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
     , column(Bytes.toBytes("E"), true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
     , column(Bytes.toBytes("F"), false, 86400 * 90, BloomType.ROWCOL, 1, Algorithm.SNAPPY, 64 * 1024)) {

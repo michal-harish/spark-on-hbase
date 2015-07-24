@@ -2,7 +2,7 @@ package org.apache.spark.hbase.demo
 
 import org.apache.spark.SparkContext
 
-object DXPJobRunner extends App {
+object DemoJobRunner extends App {
 
   /** Execution sequence **/
   try {

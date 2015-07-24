@@ -35,7 +35,7 @@ class HBaseRdd(sc: SparkContext
                , val minStamp: Long
                , val maxStamp: Long
                , val columns: String*
-                ) extends RDD[(HKey, Result)](sc, Nil) with HBaseDescriptors {
+                ) extends RDD[(HKey, Result)](sc, Nil) with HBaseUtils {
 
   private val tableNameAsString = tableName.toString
   private val configuration = new SerializableWritable(hbaseConf)

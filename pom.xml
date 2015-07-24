@@ -185,6 +185,7 @@
             <properties>
                 <shell.init.script>demo-init.scala</shell.init.script>
                 <main.jar>spark-hbase-demo</main.jar>
+                <kryo.registrator.class>org.apache.spark.hbase.demo.KryoRegistrator</kryo.registrator.class>
             </properties>
             <build>
                 <plugins>

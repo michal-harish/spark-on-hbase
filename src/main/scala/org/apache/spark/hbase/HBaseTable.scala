@@ -44,7 +44,7 @@ import scala.reflect.ClassTag
 class HBaseTable(val hbaConf: Configuration,
                  val tableNameAsString: String,
                  val numberOfRegions: Int,
-                 cfDescriptors: HColumnDescriptor*) extends HBaseDescriptors {
+                 cfDescriptors: HColumnDescriptor*) extends HBaseUtils {
 
   //val numberOfRegions: Int = getNumRegions(hbaConf, TableName.valueOf(tableNameAsString))
 

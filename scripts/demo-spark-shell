@@ -19,7 +19,7 @@ $SPARK_HOME/bin/spark-shell \
     --conf "spark.yarn.jar=$SPARK_REMOTE_JAR" \
     --conf "spark.akka.frameSize=300" \
     --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
-    --conf "spark.kryo.registrator=net.imagini.dxp.spark.KryoRegistrator" \
+    --conf "spark.kryo.registrator=org.apache.spark.hbase.demo.KryoRegistrator" \
     --conf "spark.kryo.referenceTracking=false" \
     --conf "spark.yarn.executor.memoryOverhead=$OVERHEAD" \
     --conf "spark.storage.memoryFraction=0.4" \

@@ -13,3 +13,5 @@ import org.apache.spark.storage.StorageLevel._
  */
 DEMO.init(sc)
 import DEMO._
+
+DEMO.help

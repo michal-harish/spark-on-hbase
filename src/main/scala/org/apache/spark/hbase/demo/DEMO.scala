@@ -1,15 +1,24 @@
 package org.apache.spark.hbase.demo
 
+import org.apache.hadoop.hbase.TableName
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.Seconds
 
-object DEMO extends HBAGraph with SparkUtils {
+object DEMO extends HBaseGraph with Utils {
 
   var partitionerInstance: RegionPartitioner = null
 
   override def partitioner: RegionPartitioner = partitionerInstance
+
+  def help = {
+    println("DEMO Spark-on-HBase shell usage:")
+    println(" help - print this usage manual")
+    println(" open(<hbaseTableName>) - print this usage manual")
+  }
+
+  def open(hbaseTableName: String): HBaseTable = getTable(hbaseConfig, TableName.valueOf(hbaseTableName))
 
 
   final def init(sc: SparkContext) {
