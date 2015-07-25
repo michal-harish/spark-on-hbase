@@ -369,25 +369,25 @@ trait HBaseGraph extends AGraph[HE] with Utils {
       }
     }
 
-    def loadPairs(update: PAIRS, closeContextOnExit: Boolean = false, completeAsync: Boolean = true): Long = {
-      super.load(cfNet, reverse(update).mapValues{ case (vid, he) => Map(vid.bytes -> he.hbaseValue)}, closeContextOnExit, completeAsync)
+    def loadPairs(update: PAIRS, completeAsync: Boolean = true): Long = {
+      super.load(cfNet, reverse(update).mapValues{ case (vid, he) => Map(vid.bytes -> he.hbaseValue)}, completeAsync)
     }
 
     def updateNetRdd(update: NETWORK) = update.mapValues(_.map { case (vid, he) => (vid.bytes, he.hbaseValue) }.toMap)
 
     def updateNet(rdd: NETWORK): Long = super.update(cfNet, updateNetRdd(rdd))
 
-    def loadNet(rdd: NETWORK, closeContextOnExit: Boolean = false, completeAsync: Boolean = true): Long = {
-      super.load(cfNet, updateNetRdd(rdd), closeContextOnExit, completeAsync)
+    def loadNet(rdd: NETWORK, completeAsync: Boolean = true): Long = {
+      super.load(cfNet, updateNetRdd(rdd), completeAsync)
     }
 
-    def loadNet(bsp: BSP_RESULT, closeContextOnExit: Boolean , completeAsync: Boolean): Unit = {
+    def loadNet(bsp: BSP_RESULT,  completeAsync: Boolean): Unit = {
       val (update, stats, history) = bsp
       try {
-        loadNet(update.mapValues(_._2), closeContextOnExit, completeAsync)
+        loadNet(update.mapValues(_._2), completeAsync)
       } finally {
         stats.foreach({ case (superstep, stat) => println(s"BSP ${superstep} STATS ${stat.name} = ${stat.value}") })
-        if (!closeContextOnExit) history.foreach(_.unpersist(false))
+        history.foreach(_.unpersist(false))
       }
     }
 
@@ -399,15 +399,15 @@ trait HBaseGraph extends AGraph[HE] with Utils {
       )
     }
 
-    def remove[T: ClassTag](ids: RDD[(HKey, T)],closeContextOnExit: Boolean = false, completeAsync: Boolean = true): Long = {
+    def remove[T: ClassTag](ids: RDD[(HKey, T)],  completeAsync: Boolean = true): Long = {
       val j = new HBaseJoinMultiGet[EDGES, HKey](1000, cfNet)
-      removeNet(j(CFREdges, ids.mapValues(x => null.asInstanceOf[HKey])).mapValues(_._1), closeContextOnExit, completeAsync)
+      removeNet(j(CFREdges, ids.mapValues(x => null.asInstanceOf[HKey])).mapValues(_._1), completeAsync)
     }
 
-    def removeNet(rdd: NETWORK, closeContextOnExit: Boolean = false, completeAsync: Boolean = true): Long = {
+    def removeNet(rdd: NETWORK, completeAsync: Boolean = true): Long = {
       val d = rdd.flatMap { case (key, edges) => edges.map(e => (e._1, Set(key.bytes))) :+(key, Set(null.asInstanceOf[Array[Byte]])) }
         .reduceByKey(_ ++ _).mapValues(_.toSeq)
-      bulkDelete(cfNet, d, closeContextOnExit, completeAsync)
+      bulkDelete(cfNet, d, completeAsync)
     }
 
 

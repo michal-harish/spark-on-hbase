@@ -44,7 +44,7 @@ import scala.reflect.ClassTag
 class HBaseTable(val hbaConf: Configuration,
                  val tableNameAsString: String,
                  val numberOfRegions: Int,
-                 cfDescriptors: HColumnDescriptor*) extends HBaseUtils {
+                 cfDescriptors: HColumnDescriptor*) extends Utils {
 
   //val numberOfRegions: Int = getNumRegions(hbaConf, TableName.valueOf(tableNameAsString))
 
@@ -191,7 +191,6 @@ class HBaseTable(val hbaConf: Configuration,
   /**
    * bulk load operations for put and delete wihich generate directly HFiles
    * - requires the job/shell to be run us hbase user
-   * - closeContextOnExit - is for jobs that are submit for only the purpose of loading data
    * - completeAsync - tells the job to complete the incremental load in the background or do it synchronously
    */
   val KeyValueOrdering = new Ordering[KeyValue] {
@@ -209,7 +208,7 @@ class HBaseTable(val hbaConf: Configuration,
     }
   }
 
-  def load(family: Array[Byte], bulkRdd: RDD[(HKey, Map[Array[Byte], (Array[Byte], Long)])], closeContextOnExit: Boolean, completeAsync: Boolean): Long = {
+  def load(family: Array[Byte], bulkRdd: RDD[(HKey, Map[Array[Byte], (Array[Byte], Long)])], completeAsync: Boolean): Long = {
     val context = bulkRdd.context
     val acc = context.accumulator(0L, s"HBATable ${tableName} load count")
 
@@ -227,11 +226,11 @@ class HBaseTable(val hbaConf: Configuration,
     }
     }.setName(s"HFileRDD PUT (${tableName})")
 
-    bulk(hfileRdd, closeContextOnExit, completeAsync)
+    bulk(hfileRdd, completeAsync)
     acc.value
   }
 
-  def bulkDelete(family: Array[Byte], deleteRdd: RDD[(HKey, Seq[Array[Byte]])], closeContextOnExit: Boolean, completeAsync: Boolean): Long = {
+  def bulkDelete(family: Array[Byte], deleteRdd: RDD[(HKey, Seq[Array[Byte]])], completeAsync: Boolean): Long = {
     val context = deleteRdd.context
     val acc = context.accumulator(0L, s"HBATable ${tableName} delete count")
     val cfs = families.map(_.getName)
@@ -253,11 +252,11 @@ class HBaseTable(val hbaConf: Configuration,
     }
     }.setName(s"HFileRDD DELETE (${tableName})")
 
-    bulk(hFileRdd, closeContextOnExit, completeAsync)
+    bulk(hFileRdd, completeAsync)
     acc.value
   }
 
-  private[spark] def bulk(hFileRdd: RDD[(ImmutableBytesWritable, KeyValue)], closeContextOnExit: Boolean, completeAsync: Boolean) = {
+  private[spark] def bulk(hFileRdd: RDD[(ImmutableBytesWritable, KeyValue)], completeAsync: Boolean) = {
     val context = hFileRdd.context
     val conf = hbaConf
     val fs = FileSystem.get(conf)
@@ -277,8 +276,6 @@ class HBaseTable(val hbaConf: Configuration,
         job.getConfiguration)
 
       verifyFileStatus(fs, fs.getFileStatus(hFile), "hbase")
-
-      if (closeContextOnExit) context.stop
 
       val task = new Runnable() {
         override def run() = {
