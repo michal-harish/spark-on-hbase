@@ -63,9 +63,10 @@ class DemoApp(sc: SparkContext) {
   HKeySpace.register(new DemoKeySpace("d"))
 
   def help = {
-    println("DEMO Spark-on-HBase shell usage:")
-    println(" help - print this usage manual")
-    println(" open(<hbaseTableName>) - print this usage manual")
+    println("Spark-on-HBase Graph Demo shell help:")
+    println(" help - print this usage information")
+    println(" open(<hbaseTableName>) - get a HTableInstance for a hbase table")
+    println(" graph - default demo instance of HGraph (extension of HBaseTable) ")
   }
 
   /**
