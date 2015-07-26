@@ -1,12 +1,62 @@
 package org.apache.spark.hbase.demo
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
+import org.apache.hadoop.hbase.TableName
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
 import org.apache.spark.rdd.RDD
 
-class Demo(implicit val context: SparkContext) {
+object DemoApp extends App {
+  /** Execution sequence **/
+  try {
+    if (args.length == 0) {
+      throw new IllegalArgumentException
+    }
+    implicit val context = new SparkContext() // hoping to get all configuration passed from scripts/spark-submit
+    val DEMO = new DemoApp
+    try {
+      val a = args.iterator
+      while (a.hasNext) {
+        a.next match {
+          case arg: String if (!arg.startsWith("-")) => {
+            try {
+              val methodArgs = arg.split(" ")
+              if (methodArgs.length == 1) {
+                val m = DEMO.getClass.getMethod(methodArgs(0))
+                time(m.invoke(DEMO))
+              } else {
+                val m = DEMO.getClass.getMethod(methodArgs(0), classOf[String])
+                time(m.invoke(DEMO, methodArgs(1)))
+              }
+            } catch {
+              case e: NoSuchMethodException => println(s"method `${args(0)}` not defined in the DXPJobRunner")
+            } finally {
+              context.stop
+            }
+          }
+        }
+      }
+    } finally {
+      DEMO.context.stop
+    }
+  } catch {
+    case e: IllegalArgumentException => {
+      println("Usage:")
+      println("./spark-submit [-p] [-l|-xl|-xxl]  \"<command [argument]>\" ")
+    }
+  }
+
+  def time[A](a: => A): A = {
+    val l = System.currentTimeMillis
+    val r = a
+    println((System.currentTimeMillis - l).toDouble / 1000)
+    r
+  }
+
+}
+
+class DemoApp(sc: SparkContext) {
+
+  implicit val context = sc
 
   val graph = new HGraph("demo-graph", 256)
 
@@ -29,7 +79,7 @@ class Demo(implicit val context: SparkContext) {
 
   /**
    * From undriected adjacency lists creates a redundant directed network graph
-   * in: RDD[(VdnaId,PartnerId)]
+   * in: RDD[(id1,id2)]
    */
   final def fromList(he: HE, in: RDD[Seq[HKey]]): graph.NETWORK = {
     graph.deduplicate(

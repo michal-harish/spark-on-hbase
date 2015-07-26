@@ -211,7 +211,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
   }
 
   /**
-   * returns (cookie count, user count) of a collapsed graph
+   * returns (vertex count, group count) of a collapsed graph
    */
   final def counts(net: NETWORK): (Long, Long) = {
     val counts: (Long, Double) = net.map(x => (1, (1.0 / (1.0 + x._2.length.toDouble))))
@@ -228,8 +228,8 @@ trait AGraph[PROPS <: Props[PROPS]] {
   }
 
   /**
-   * Simple EXPAND takes a pool of cookies and expands it through the given graph network
-   * and returns an expanded pool of cookie pairs: in each 1. unique cookie and 2. highest connected cookie
+   * Simple EXPAND takes a pool of vertices and expands it through the given graph network
+   * and returns an expanded pool of vertex pairs: in each 1. unique vertex and 2. highest connected vertex
    */
   final def expand(net: NETWORK, users: POOL)(implicit partitioner: RegionPartitioner): POOL = {
     users.leftOuterJoin(net, partitioner).flatMap({ case (key, (maxEdge, netEdges)) => {
@@ -281,7 +281,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
   final def aggregate[X: ClassTag](layer: LAYER[X], sum: (X, X) => X): (Long, X) = layer.map(x => (1L, x._2)).reduce((a, b) => (a._1 + b._1, sum(a._2, b._2)))
 
   /**
-   * returns a triplet of (#users, #cookies, ∑X) as an aggregate of the overlay computed by profile or expand
+   * returns a triplet of (#groups, #vertices, ∑X) as an aggregate of the overlay computed by profile or expand
    */
   final def aggregate(overlay: RDD[(HKey, (HKey, Long))]): (Long, Long, Long) = aggregate(overlay, (a: Long, b: Long) => a + b)
 

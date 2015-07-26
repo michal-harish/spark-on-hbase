@@ -22,7 +22,7 @@ class TestSparkContext(config: SparkConf) extends SparkContext(config) {
 
 /* kafka7 streaming simulation
 
-<kafka-dist>/bin/kafka-console-consumer.sh --zookeeper bl-queue-p01.visualdna.com --topic datasync | nc -lk 9999
+<kafka-dist>/bin/kafka-console-consumer.sh --zookeeper ... --topic ...| nc -lk 9999
  */
 object KafkaProxy {
   var port = 9999

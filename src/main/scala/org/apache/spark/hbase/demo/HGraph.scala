@@ -19,9 +19,7 @@ import scala.reflect.ClassTag
 
 /**
  * Created by mharis on 26/07/15.
- */
-
-/**
+ *
  * HE - HGraphEdge - is a lightweight object that holds the properties of each edge in the HGraph
  */
 object HE extends java.io.Serializable {
@@ -111,7 +109,7 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
   val cfEval = Bytes.toBytes("E")
   val cfFeatures = Bytes.toBytes("F")
 
-  val propsFile = new Path(s"/vdna/dxp/hgraph/${tableName}")
+  val propsFile = new Path(s"/hgraph/${tableName}") //TODO configurable path for hgraph properties
   val props = scala.collection.mutable.LinkedHashMap[String, String]()
 
   val CFRFeatures: CFR[FEATURES] = (row: Result) => {
@@ -171,12 +169,12 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
     stream.close
   }
 
-  def rddFeatures: LAYER[FEATURES] = rdd(HKeySpace("vdna"), cfFeatures, HConstants.LATEST_TIMESTAMP).mapValues(CFRFeatures)
+  def rddFeatures: LAYER[FEATURES] = rdd(HKeySpace("d"), cfFeatures, HConstants.LATEST_TIMESTAMP).mapValues(CFRFeatures)
 
   def rddFeatures[T](feature: String)(implicit tag: ClassTag[T]): LAYER[T] = {
     val cfFeatures = this.cfFeatures
     val fFeature = Bytes.toBytes(feature)
-    val filtered = rdd(HKeySpace("vdna"), cfFeatures, HConstants.LATEST_TIMESTAMP).filter(_._2.containsNonEmptyColumn(cfFeatures, fFeature))
+    val filtered = rdd(HKeySpace("d"), cfFeatures, HConstants.LATEST_TIMESTAMP).filter(_._2.containsNonEmptyColumn(cfFeatures, fFeature))
     val t: ((Result) => T) = tag.runtimeClass match {
       case java.lang.Long.TYPE => (row: Result) => Bytes.toLong(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
       case java.lang.Double.TYPE => (row: Result) => Bytes.toDouble(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
@@ -361,8 +359,6 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
     bulkDelete(cfNet, d, completeAsync)
   }
 
-
-  //- this will allow us to load syncs pairs flat and then trigger bsp say only on ddp and email hash syncs
   /**
    * This is a stateless BSP algorithm that propagates connection with deteriorating probabilities
    * - it uses recursive RDD mapping without modifying HBase

@@ -41,5 +41,5 @@ $SPARK_HOME/bin/spark-submit \
     --conf "spark.executorEnv.HADOOP_CONF_DIR=$HADOOP_CONF_DIR" \
     --driver-class-path "/usr/lib/hbase/*:/usr/lib/hbase/lib/htrace-core-3.1.0-incubating.jar:/usr/lib/hbase/lib/guava-12.0.1.jar" \
     --driver-library-path "/usr/lib/hadoop/lib/native" \
-    --class "net.imagini.dxp.spark.DXPJobRunner" \
+    --class "net.imagini.dxp.spark.DemoApp" \
     "spark-on-hbase-demo.jar" "$@"
