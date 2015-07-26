@@ -218,12 +218,6 @@
                                                 implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
                                             <resource>reference.conf</resource>
                                         </transformer>
-                                        <transformer
-                                                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                            <manifestEntries>
-                                                <Main-Class>org.apache.spark.hbase.demo.DEMO</Main-Class>
-                                            </manifestEntries>
-                                        </transformer>
                                     </transformers>
                                 </configuration>
                             </execution>

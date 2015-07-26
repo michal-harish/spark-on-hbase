@@ -5,8 +5,10 @@ import java.io.ByteArrayOutputStream
 import com.esotericsoftware.kryo.io.Input
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path, FileSystem}
-import org.apache.hadoop.hbase.TableName
+import org.apache.hadoop.hbase.{HBaseConfiguration, HColumnDescriptor, TableName}
 import org.apache.hadoop.hbase.client.ConnectionFactory
+import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
+import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.io.{BytesWritable, NullWritable}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -17,7 +19,7 @@ import scala.reflect.ClassTag
 /**
  * Created by mharis on 17/06/15.
  */
-trait Utils {
+object Utils {
 
   final def initConfig[T <: Configuration](sc: SparkContext, config: T, fs: FileStatus*): T = {
     if (fs.size == 0) {
@@ -26,7 +28,6 @@ trait Utils {
       initConfig(sc, config, localFs.listStatus(new Path(s"file://${sc.getConf.get("spark.executorEnv.HBASE_CONF_DIR")}")): _*)
     } else fs.foreach { configFileStatus => {
       if (configFileStatus.getPath.getName.endsWith(".xml")) {
-        println("INITIALISING CONFIG " + configFileStatus.getPath)
         config.addResource(configFileStatus.getPath)
       }
     }
@@ -34,8 +35,10 @@ trait Utils {
     config
   }
 
-  def getTable(hbaseConf: Configuration, tableName: TableName): HBaseTable = {
-    val connection = ConnectionFactory.createConnection(hbaseConf)
+
+  def getTable(tableName: TableName)(implicit context: SparkContext): HBaseTable = {
+    val hbaseConfig = Utils.initConfig(context, HBaseConfiguration.create)
+    val connection = ConnectionFactory.createConnection(hbaseConfig)
     try {
       val admin = connection.getAdmin
       try {
@@ -43,7 +46,7 @@ trait Utils {
         try {
           val numRegions = regionLocator.getStartKeys.length
           val desc = admin.getTableDescriptor(tableName)
-          new HBaseTable(hbaseConf, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*)
+          new HBaseTable(hbaseConfig, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*)
         } finally {
           regionLocator.close
         }
@@ -81,6 +84,24 @@ trait Utils {
     }
   }
 
+  def column(familyName: Array[Byte],
+             inMemory: Boolean,
+             maxTtlSeconds: Int,
+             bt: BloomType,
+             numVersions: Int,
+             compression: Algorithm,
+             blocksizeBytes: Int = 64 * 1024): HColumnDescriptor = {
+    val family: HColumnDescriptor = new HColumnDescriptor(familyName)
+    family.setBlockCacheEnabled(true)
+    family.setCompressionType(compression)
+    family.setMinVersions(0) // min version overrides the ttl behaviour, i.e. minVersions=1 will always keep the latest cell versions despite the ttl
+    family.setMaxVersions(numVersions)
+    family.setTimeToLive(maxTtlSeconds)
+    family.setInMemory(inMemory)
+    family.setBloomFilterType(bt)
+    family.setBlocksize(blocksizeBytes)
+    family
+  }
   def info(tag: String, rdd: RDD[_]): Unit = {
     println(s"${tag} ${rdd.name} PARTITIONER: ${rdd.partitioner}")
     println(s"${tag} ${rdd.name} NUM.PARTITIONS: ${rdd.partitions.size}")

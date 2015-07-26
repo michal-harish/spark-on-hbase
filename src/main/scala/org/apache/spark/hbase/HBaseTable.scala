@@ -44,7 +44,7 @@ import scala.reflect.ClassTag
 class HBaseTable(val hbaConf: Configuration,
                  val tableNameAsString: String,
                  val numberOfRegions: Int,
-                 cfDescriptors: HColumnDescriptor*) extends Utils {
+                 cfDescriptors: HColumnDescriptor*) {
 
   //val numberOfRegions: Int = getNumRegions(hbaConf, TableName.valueOf(tableNameAsString))
 
@@ -69,7 +69,7 @@ class HBaseTable(val hbaConf: Configuration,
   abstract class HBaseLookup[L, R]
     extends Function2[CFR[L], RDD[(HKey, (Option[L], R))], RDD[(HKey, (Option[L], R))]]
 
-  val partitioner = new RegionPartitioner(numberOfRegions)
+  implicit val partitioner = new RegionPartitioner(numberOfRegions)
 
   val tableName = TableName.valueOf(tableNameAsString)
   val trace = new org.apache.htrace.Trace

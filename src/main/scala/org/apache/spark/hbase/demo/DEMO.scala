@@ -1,16 +1,18 @@
 package org.apache.spark.hbase.demo
 
-import org.apache.hadoop.hbase.TableName
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
-import org.apache.spark.streaming.StreamingContext
-import org.apache.spark.streaming.Seconds
+import org.apache.spark.rdd.RDD
 
-object DEMO extends HBaseGraph with Utils {
+class Demo(implicit val context: SparkContext) {
 
-  var partitionerInstance: RegionPartitioner = null
+  val graph = new HGraph("demo-graph", 256)
 
-  override def partitioner: RegionPartitioner = partitionerInstance
+  implicit val partitioner = graph.partitioner
+
+  HKeySpace.register(new DemoKeySpace("d"))
 
   def help = {
     println("DEMO Spark-on-HBase shell usage:")
@@ -18,25 +20,27 @@ object DEMO extends HBaseGraph with Utils {
     println(" open(<hbaseTableName>) - print this usage manual")
   }
 
-  def open(hbaseTableName: String): HBaseTable = getTable(hbaseConfig, TableName.valueOf(hbaseTableName))
-
-
-  final def init(sc: SparkContext) {
-    initHBase(sc)
-    val isLocal = sc.getConf.get("spark.master", "local").startsWith("local")
-    val numPartitions = sc.getConf.getInt("spark.yarn.executor.memoryOverhead", 384) match {
-      case c: Int if c >= 1024 => 8192
-      case c: Int if c >= 512 => 4096
-      case c: Int if c == 385 => 512
-      case _ => 2048
-    }
-    println("numPartitions = " + numPartitions)
-    this.context = sc
-    this.ssc = new StreamingContext(context, Seconds(2))
-    this.partitionerInstance = new RegionPartitioner(numPartitions)
+  /**
+   * From an adjacency lists represented as coma-separated ids to a redundant NETWORK
+   */
+  final def fromTextList(he: HE, textFile: RDD[String], keySpace: String): graph.NETWORK = {
+    fromList(he, textFile.map(_.split(",").map(HKey(keySpace, _)).toSeq))
   }
 
-  var ssc: StreamingContext = null
+  /**
+   * From undriected adjacency lists creates a redundant directed network graph
+   * in: RDD[(VdnaId,PartnerId)]
+   */
+  final def fromList(he: HE, in: RDD[Seq[HKey]]): graph.NETWORK = {
+    graph.deduplicate(
+      in.flatMap(a => {
+        val sortedEdges = a.sorted.map(v => (v, he))
+        for (id <- a) yield ((id, sortedEdges.filter(_._1 != id)))
+      }))
+  }
+
+  def open(hbaseTableName: String): HBaseTable = Utils.getTable(TableName.valueOf(hbaseTableName))
+
 
   //  /**
   //   * Used for post-splitting. Because we manage region splits manually when the table grows large
@@ -105,30 +109,5 @@ object DEMO extends HBaseGraph with Utils {
   //    })
   //    HGraphII.loadNet(migrateRdd, closeContextOnExit = true, completeAsync = false)
   //  }
-  //
-  //  def startStreaming() = ssc.start
-  //
-  //  def stopStreaming() = ssc.stop(false)
-  //  def msgStream[T <: VDNAMessagePartner]()(implicit t: scala.reflect.Manifest[T]): DStream[T] = {
-  //    //val stream = KafkaUtils.createStream(ssc, "bl-message-s01", "spark-streaming-test", Map("userpermissions" -> 1)).map(_._2)
-  //    val stream = ssc.socketTextStream("localhost", 9999)
-  //    stream.transform(rdd => rdd.mapPartitions(part => {
-  //      val uni = new VDNAUniversalDeserializer
-  //      part.map(message => uni.decodeString(message))
-  //        .filter(x => t.erasure.isInstance(x))
-  //        .map(x => t.erasure.cast(x).asInstanceOf[T])
-  //    }))
-  //  }
-  //
-  //  def syncStream(idSpace: String): DStream[(Vid, Vid)] = {
-  //    msgStream[VDNAUserImport].filter(_.getIdSpace().equals(idSpace))
-  //      .map(msg => (Vid(msg.getUserUid().toString), Vid(msg.getIdSpace(), msg.getPartnerUserId())))
-  //  }
-  //
-  //  def syncStream(): DStream[(Vid, Vid)] = {
-  //    msgStream[VDNAUserImport].filter(x => Vid.idSpaces.exists(y => y._2 == x.getIdSpace))
-  //      .map(msg => (Vid(msg.getUserUid().toString), Vid(msg.getIdSpace(), msg.getPartnerUserId())))
-  //  }
-
 
 }

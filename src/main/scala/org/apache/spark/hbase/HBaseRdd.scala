@@ -35,7 +35,7 @@ class HBaseRdd(sc: SparkContext
                , val minStamp: Long
                , val maxStamp: Long
                , val columns: String*
-                ) extends RDD[(HKey, Result)](sc, Nil) with Utils {
+                ) extends RDD[(HKey, Result)](sc, Nil) {
 
   private val tableNameAsString = tableName.toString
   private val configuration = new SerializableWritable(hbaseConf)
@@ -49,7 +49,7 @@ class HBaseRdd(sc: SparkContext
   def this(sc: SparkContext, hbaConf: Configuration, tableName: TableName, idSpace: Short, columns: String*)
   = this(sc, hbaConf, tableName, idSpace, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
 
-  val regionSplits: Array[(Array[Byte], Array[Byte])] = getRegionSplits(hbaseConf, tableName)
+  val regionSplits: Array[(Array[Byte], Array[Byte])] = Utils.getRegionSplits(hbaseConf, tableName)
 
   override protected def getPartitions: Array[Partition] = {
     (for (i <- 0 to regionSplits.size - 1) yield {
