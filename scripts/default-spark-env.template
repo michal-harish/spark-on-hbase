@@ -11,9 +11,9 @@ set -u
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 printf "Running %s\n" "${0}"
+printf -- " - %-20s: %s\n" HBASE_CONF_DIR $HBASE_CONF_DIR
 printf -- " - %-20s: %s\n" HADOOP_CONF_DIR $HADOOP_CONF_DIR
 printf -- " - %-20s: %s\n" HADOOP_HOME $HADOOP_HOME
-printf -- " - %-20s: %s\n" HBASE_HOME $HBASE_HOME
 printf -- " - %-20s: %s\n" SPARK_HOME $SPARK_HOME
 echo
 

@@ -11,8 +11,8 @@ object DemoApp extends App {
     if (args.length == 0) {
       throw new IllegalArgumentException
     }
-    implicit val context = new SparkContext() // hoping to get all configuration passed from scripts/spark-submit
-    val DEMO = new DemoApp
+    val context = new SparkContext() // hoping to get all configuration passed from scripts/spark-submit
+    val demo = new DemoApp(context)
     try {
       val a = args.iterator
       while (a.hasNext) {
@@ -21,22 +21,20 @@ object DemoApp extends App {
             try {
               val methodArgs = arg.split(" ")
               if (methodArgs.length == 1) {
-                val m = DEMO.getClass.getMethod(methodArgs(0))
-                time(m.invoke(DEMO))
+                val m = demo.getClass.getMethod(methodArgs(0))
+                time(m.invoke(demo))
               } else {
-                val m = DEMO.getClass.getMethod(methodArgs(0), classOf[String])
-                time(m.invoke(DEMO, methodArgs(1)))
+                val m = demo.getClass.getMethod(methodArgs(0), classOf[String])
+                time(m.invoke(demo, methodArgs(1)))
               }
             } catch {
               case e: NoSuchMethodException => println(s"method `${args(0)}` not defined in the DXPJobRunner")
-            } finally {
-              context.stop
             }
           }
         }
       }
     } finally {
-      DEMO.context.stop
+      context.stop
     }
   } catch {
     case e: IllegalArgumentException => {

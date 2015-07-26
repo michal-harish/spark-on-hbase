@@ -8,7 +8,7 @@ import scala.sys.process.Process
 
 class TestSparkContext(config: SparkConf) extends SparkContext(config) {
   def this(parallelism: Int = 4) = this({
-    val conf = new SparkConf().setAppName("dxp-spark-test")
+    val conf = new SparkConf().setAppName("spark-on-hbase-test")
     conf.setMaster(s"local[${parallelism}]")
     conf.set("spark.hadoop.validateOutputSpecs", "false")
     conf.set("spark.default.parallelism", s"${parallelism}")

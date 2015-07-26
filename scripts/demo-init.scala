@@ -13,6 +13,8 @@ import org.apache.spark.storage.StorageLevel._
  */
 val app = new DemoApp(sc)
 
+app.graph.createIfNotExists
+
 import app._
 
 help

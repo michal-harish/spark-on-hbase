@@ -14,8 +14,8 @@ $SPARK_HOME/bin/spark-shell \
     --executor-memory $MEMORY \
     --executor-cores 1 \
     --queue "prod" \
-    --name "dxp-terminal" \
-    --conf "spark.app.name=dxp-terminal" \
+    --name "spark-hbase-demo-terminal" \
+    --conf "spark.app.name=spark-hbase-demo-terminal" \
     --conf "spark.yarn.jar=$SPARK_REMOTE_JAR" \
     --conf "spark.akka.frameSize=300" \
     --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \

@@ -13,12 +13,12 @@ $SPARK_HOME/bin/spark-submit \
     --executor-memory $MEMORY \
     --executor-cores 1 \
     --queue "$QUEUE" \
-    --name "dxp-pipe $@" \
-    --conf "spark.app.name=dxp-job" \
+    --name "spark-hbase-demo $@" \
+    --conf "spark.app.name=spark-hbase-demo" \
     --conf "spark.yarn.jar=$SPARK_REMOTE_JAR" \
     --conf "spark.akka.frameSize=300" \
     --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
-    --conf "spark.kryo.registrator=net.imagini.dxp.spark.KryoRegistrator" \
+    --conf "spark.kryo.registrator=org.apache.spark.hbase.demo.KryoRegistrator" \
     --conf "spark.kryo.referenceTracking=false" \
     --conf "spark.yarn.executor.memoryOverhead=$OVERHEAD" \
     --conf "spark.storage.memoryFraction=0.35" \
@@ -41,5 +41,5 @@ $SPARK_HOME/bin/spark-submit \
     --conf "spark.executorEnv.HADOOP_CONF_DIR=$HADOOP_CONF_DIR" \
     --driver-class-path "/usr/lib/hbase/*:/usr/lib/hbase/lib/htrace-core-3.1.0-incubating.jar:/usr/lib/hbase/lib/guava-12.0.1.jar" \
     --driver-library-path "/usr/lib/hadoop/lib/native" \
-    --class "net.imagini.dxp.spark.DemoApp" \
+    --class "org.apache.spark.hbase.demo.DemoApp" \
     "spark-on-hbase-demo.jar" "$@"

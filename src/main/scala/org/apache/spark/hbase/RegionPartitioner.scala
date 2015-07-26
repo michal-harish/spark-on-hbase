@@ -19,7 +19,7 @@ class RegionPartitioner(val numRegions: Int) extends Partitioner {
   val startKey: Array[Byte] = splitKeys(1)
   val endKey: Array[Byte] = splitKeys(splitKeys.length - 1)
 
-  override def toString: String = s"dxp.spark.RegionPartitioner(${numRegions})"
+  override def toString: String = s"RegionPartitioner(${numRegions})"
 
   override def numPartitions = numRegions
 
