@@ -53,7 +53,7 @@ class HBaseRddHKey(sc: SparkContext
     scan
   }
 
-  override protected def mapKey = (rowKey: Array[Byte]) => HKey(rowKey)
+  override protected def bytesToKey = (rowKey: Array[Byte]) => HKey(rowKey)
   
   override protected def mapValue = (row: Result) => row
 

@@ -38,5 +38,5 @@ You can then run the demo appliation as a shell:
 
 # TODOs
 
-- Move HBaseJoin and HBaseLookup into the basic implementation from the keyspace
+- Refactor join functionality into HBaseRdd, but in such way it doesn't conflict with the existing PairRDDFunctions
 - refactor for enabling forks and make the graph demo an example of a fork

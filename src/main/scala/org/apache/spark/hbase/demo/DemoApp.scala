@@ -3,7 +3,6 @@ package org.apache.spark.hbase.demo
 import org.apache.hadoop.hbase.TableName
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
-import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
 import org.apache.spark.hbase.keyspace._
 import org.apache.spark.rdd.RDD
 

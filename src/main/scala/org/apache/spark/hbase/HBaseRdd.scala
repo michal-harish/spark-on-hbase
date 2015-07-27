@@ -22,7 +22,7 @@ abstract class HBaseRdd[K, V](sc: SparkContext
   protected val configuration = new SerializableWritable(hbaseConf)
   protected val regionSplits: Array[(Array[Byte], Array[Byte])] = Utils.getRegionSplits(hbaseConf, tableName)
 
-  protected def mapKey: Array[Byte] => K
+  protected def bytesToKey: Array[Byte] => K
 
   protected def mapValue: Result => V
 
@@ -87,7 +87,7 @@ abstract class HBaseRdd[K, V](sc: SparkContext
             connection.close
             false
           } else {
-            current = Some((mapKey(result.getRow), mapValue(result)))
+            current = Some((bytesToKey(result.getRow), mapValue(result)))
             true
           }
         } else {
