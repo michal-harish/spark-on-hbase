@@ -71,6 +71,8 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
       val tableNameAsString = self.tableNameAsString
       val multiGetSize = maxGetSize
       val multiget = HBaseRDDFunctions.this.multiget
+      val keyToBytes = self.keyToBytes
+      val bytesToKey = self.bytesToKey
       rightSideRdd.mapPartitions(part => {
         val connection = ConnectionFactory.createConnection(broadCastConf.value)
         val table = connection.getTable(TableName.valueOf(tableNameAsString))
@@ -121,13 +123,13 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
               val bufferMap = scala.collection.mutable.Map[K, (L, R)]()
               while (multiGetList.size < multiGetSize && part.hasNext) {
                 val (vid, rightSideValue) = part.next
-                multiGetList += self.keyToBytes(vid)
+                multiGetList += keyToBytes(vid)
                 bufferMap(vid) = ((null.asInstanceOf[L], rightSideValue))
               }
               if (!multiGetList.isEmpty) {
                 multiget(table, multiGetList, cf).foreach(row => {
                   if (!row.isEmpty) {
-                    val key = self.bytesToKey(row.getRow)
+                    val key = bytesToKey(row.getRow)
                     bufferMap(key) = (cfr(row), bufferMap(key)._2)
                   }
                 })
@@ -149,6 +151,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
       val cf = this.cf
       val broadCastConf = new SerializableWritable(self.hbaseConf)
       val tableNameAsString = self.tableNameAsString
+      val keyToBytes = self.keyToBytes
       rightSideRddWithSortedPartitions.mapPartitionsWithIndex[(K, (L, R))] { case (p, part) => {
         if (part.isEmpty) {
           Iterator.empty
@@ -166,7 +169,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
           var leftRow: Result = null
 
           private def nextLeftRow {
-            val headRowKey = self.keyToBytes(forward.head._1)
+            val headRowKey = keyToBytes(forward.head._1)
             //open new scan each time the difference between last and next vid is too big
             if (scanner == null || (1000 < ByteUtils.asIntValue(headRowKey) - ByteUtils.asIntValue(leftRow.getRow))) {
               if (scanner != null) scanner.close
@@ -184,7 +187,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
                 if (leftRow == null) nextLeftRow
                 while (leftRow != null && current.isEmpty && forward.hasNext) {
                   val rightRow = forward.head
-                  Bytes.compareTo(leftRow.getRow, self.keyToBytes(rightRow._1)) match {
+                  Bytes.compareTo(leftRow.getRow, keyToBytes(rightRow._1)) match {
                     case cmp: Int if (cmp == 0) => {
                       current = Some((rightRow._1, (cfr(leftRow), rightRow._2)))
                       forward.next
@@ -224,6 +227,8 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
       val tableNameAsString = self.tableNameAsString
       val multiGetSize = batchSize
       val multiget = HBaseRDDFunctions.this.multiget
+      val keyToBytes = self.keyToBytes
+      val bytesToKey = self.bytesToKey
       rightSideRdd.mapPartitions(part => {
         val connection = ConnectionFactory.createConnection(broadCastConf.value)
         val table = connection.getTable(TableName.valueOf(tableNameAsString))
@@ -251,13 +256,13 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
             }
             while (forward.hasNext && forward.head._2._1.isEmpty && multiGet.size < multiGetSize) {
               val (vid, (leftSideValue, rightSideValue)) = forward.next
-              multiGet += self.keyToBytes(vid)
+              multiGet += keyToBytes(vid)
               bufferMap(vid) = ((emptyLeftSide, rightSideValue))
             }
             if (!forward.hasNext || bufferMap.size >= multiGetSize) {
               val multiGetList = new util.ArrayList[Get]()
               multiget(table, multiGet, cf).foreach(row => if (!row.isEmpty) {
-                val key = self.bytesToKey(row.getRow)
+                val key = bytesToKey(row.getRow)
                 bufferMap(key) = (Some(cfr(row)), bufferMap(key)._2)
               })
 

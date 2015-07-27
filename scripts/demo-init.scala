@@ -5,6 +5,7 @@ import scala.math._
 import org.apache.spark.hbase.demo.DemoApp
 import org.apache.spark.hbase._
 import org.apache.spark.hbase.keyspace._
+import org.apache.spark.hbase.demo._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.storage.StorageLevel._
 

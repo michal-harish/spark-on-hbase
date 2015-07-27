@@ -70,9 +70,9 @@ class DemoApp(sc: SparkContext) {
   def help = {
     println("Spark-on-HBase Graph Demo shell help:")
     println(" help - print this usage information")
-    println(" open(<hbaseTableName>) - get a basic HBaseTable for any existing table for which key bytes can be represented as Sring")
+    println(" open(<hbaseTableName>) - get a basic HBaseTable for any existing table for which key bytes can be represented as String")
     println(" graph - reference to the main graph instance (HGraph extends HBaseTable) ")
-    println(" graph.createIfNotExists - create the undelying HBase table")
+    println(" graph.createIfNotExists - create the underlying HBase table")
   }
 
   def open(hbaseTableName: String): HBaseTable[String] = {
@@ -90,6 +90,7 @@ class DemoApp(sc: SparkContext) {
             override protected def keyToBytes = (rowKey: String) => rowKey.getBytes
             override protected def bytesToKey = (key: Array[Byte]) => new String(key)
           }
+          new HBaseTable[String](hbaseConfig, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*) { override protected def keyToBytes = (rowKey: String) => rowKey.getBytes; override protected def bytesToKey = (key: Array[Byte]) => new String(key)}
         } finally {
           regionLocator.close
         }

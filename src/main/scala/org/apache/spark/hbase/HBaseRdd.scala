@@ -26,8 +26,6 @@ abstract class HBaseRDD[K, V](sc: SparkContext
                , val maxStamp: Long
                , val columns: String*) extends RDD[(K, V)](sc, Nil) {
 
-  def this(sc: SparkContext, tableName: TableName) = this(sc, tableName, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP)
-
   val tableNameAsString = tableName.toString
 
   val cf: Seq[Array[Byte]] = columns.map(_ match {
@@ -82,6 +80,7 @@ abstract class HBaseRDD[K, V](sc: SparkContext
     val scan = getRegionScan(split.index)
     val scanner: ResultScanner = table.getScanner(scan)
     var current: Option[(K, V)] = None
+    val bytesToKey = this.bytesToKey
 
     new Iterator[(K, V)] {
       override def hasNext: Boolean = current match {
