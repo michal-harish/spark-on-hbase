@@ -1,6 +1,7 @@
 package org.apache.spark.hbase.demo
 
-import org.apache.spark.hbase.{HKey, RegionPartitioner}
+import org.apache.spark.hbase.RegionPartitioner
+import org.apache.spark.hbase.keyspace.HKey
 import org.apache.spark.rdd.RDD
 import org.apache.spark.rdd.RDD.{rddToOrderedRDDFunctions, rddToPairRDDFunctions}
 import org.apache.spark.storage.StorageLevel._
@@ -19,7 +20,6 @@ trait Props[A <: Props[A]] {
 trait AGraph[PROPS <: Props[PROPS]] {
 
   type HISTORY = scala.collection.mutable.MutableList[RDD[_]]
-
 
   /**
    * LAYER is an abstract concept which is represented by a Key-Value Spark RDD with fixed key type - Vid - and

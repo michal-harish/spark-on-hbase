@@ -9,6 +9,8 @@ import org.apache.hadoop.hbase.client.Result
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
+import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
+import org.apache.spark.hbase.keyspace.{HBaseTableHKey, HKeySpace, HKey}
 import org.apache.spark.{SparkContext, Accumulator}
 import org.apache.spark.hbase._
 import org.apache.spark.rdd.RDD
@@ -94,8 +96,8 @@ class HE(val bytes: Array[Byte], val vendorCode: Short, val ts: Long) extends ja
 }
 
 
-class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkContext)
-  extends HBaseTable(Utils.initConfig(context, HBaseConfiguration.create), tableName: String, numberOfRegions
+class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkContext, reg: HKSREG)
+  extends HBaseTableHKey(Utils.initConfig(context, HBaseConfiguration.create), tableName: String, numberOfRegions
   , Utils.column(Bytes.toBytes("N"), true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
   , Utils.column(Bytes.toBytes("E"), true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
   , Utils.column(Bytes.toBytes("F"), false, 86400 * 90, BloomType.ROWCOL, 1, Algorithm.SNAPPY, 64 * 1024))
@@ -306,9 +308,9 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
     j(CFREdges, rightSideRdd)
   }
 
-  def get(vid: HKey*): Array[(HKey, EDGES, FEATURES)] = multiget(vid: _*).filter(_ != null).map(row => {
-    (HKey(row.getRow), CFREdges(row), CFRFeatures(row))
-  })
+//  def get(vid: HKey*): Array[(HKey, EDGES, FEATURES)] = get(vid: _*).filter(_ != null).map(row => {
+//    (HKey(row.getRow), CFREdges(row), CFRFeatures(row))
+//  })
 
   def filter[X: ClassTag](preSorted: Boolean, rdd: LAYER[X]): LAYER[X] = {
     if (preSorted) {

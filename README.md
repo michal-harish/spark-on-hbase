@@ -38,5 +38,5 @@ You can then run the demo appliation as a shell:
 
 # TODOs
 
-- Currently HBaseRdd is RDD[(HKey, Result)] but most of the functionality can be described for RDD[(Array[Byte], Result)] - implementing all of the rich functionality at the lower level will enable usage without HKey and HKeySpace
+- Move HBaseJoin and HBaseLookup into the basic implementation from the keyspace
 - refactor for enabling forks and make the graph demo an example of a fork

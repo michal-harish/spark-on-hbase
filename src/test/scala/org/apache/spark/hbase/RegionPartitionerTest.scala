@@ -2,6 +2,8 @@ package org.apache.spark.hbase
 
 import java.util.UUID
 
+import org.apache.spark.hbase.keyspace.HKeySpaceRegistry._
+import org.apache.spark.hbase.keyspace._
 import org.scalatest.{FlatSpec, Matchers}
 
 /**
@@ -9,8 +11,11 @@ import org.scalatest.{FlatSpec, Matchers}
  */
 class RegionPartitionerTest extends FlatSpec with Matchers {
 
-  HKeySpace.register(new HKeySpaceUUID("test"))
-  HKeySpace.register(new HKeySpaceString("d"))
+  implicit val TestHKeySpaceReg: HKSREG = Map(
+    new HKeySpaceUUID("test").keyValue,
+    new HKeySpaceString("d").keyValue
+  )
+
 
   val p1 = new RegionPartitioner(5)
   println(s"NUM REGIONS ${p1.numRegions}")
@@ -54,7 +59,7 @@ class RegionPartitionerTest extends FlatSpec with Matchers {
   println(s"BEST POSSIBLE DISTRIBUTION STDEV = 0")
   print("...")
   val t = System.currentTimeMillis()
-  for(i <- (1 to n)) {
+  for (i <- (1 to n)) {
     val vid = HKey("test", UUID.randomUUID.toString)
     val part = p.getPartition(vid)
     if (hist.contains(part)) hist += (part -> (hist(part) + 1)) else hist += (part -> 1)
@@ -62,18 +67,18 @@ class RegionPartitionerTest extends FlatSpec with Matchers {
   println(s"${System.currentTimeMillis() - t} ms")
   println(s"ACTUAL PARTITION COUNT = ${hist.size}")
   val mean = hist.map(_._2).reduce(_ + _).toDouble / hist.size
-  val min =  hist.map(_._2).foldLeft(Int.MaxValue)((a,b) => if (b<a) b else a)
-  val max =  hist.map(_._2).foldLeft(Int.MinValue)((a,b) => if (b>a) b else a)
+  val min = hist.map(_._2).foldLeft(Int.MaxValue)((a, b) => if (b < a) b else a)
+  val max = hist.map(_._2).foldLeft(Int.MinValue)((a, b) => if (b > a) b else a)
 
   //hist.foreach(println)
   println(s"ACTUAL MEAN COUNT PER PARTITION = ${mean}")
   println(s"ACTUAL DISTRIBUTION RANGE= [${min},${max}]")
-  var stdev = math.sqrt(hist.map(a => (math.pow(a._2, 2))).reduce(_ + _).toDouble / hist.size - math.pow(mean,2))
+  var stdev = math.sqrt(hist.map(a => (math.pow(a._2, 2))).reduce(_ + _).toDouble / hist.size - math.pow(mean, 2))
   println(s"ACTUAL DISTRIBUTION STDEV = ±${stdev}")
   val devAboutMean = math.round(stdev / mean * 10000.0) / 100.0
   println(s"ACTUAL DISTRIBUTION STDEV = ±${devAboutMean} %")
 
-  mean should be (e)
+  mean should be(e)
   devAboutMean should be < 2.5
 
 }

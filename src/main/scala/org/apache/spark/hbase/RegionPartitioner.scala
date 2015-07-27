@@ -6,6 +6,7 @@ package org.apache.spark.hbase
 
 import org.apache.hadoop.hbase.KeyValue
 import org.apache.hadoop.hbase.util.Bytes
+import org.apache.spark.hbase.keyspace.HKey
 import org.apache.spark.{HashPartitioner, Partitioner}
 
 class RegionPartitioner(val numRegions: Int) extends Partitioner {

@@ -11,6 +11,8 @@ import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.io.{BytesWritable, NullWritable}
 import org.apache.spark.SparkContext
+import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
+import org.apache.spark.hbase.keyspace.{HBaseTableHKey, HKey}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
 import scala.collection.JavaConverters._
@@ -36,7 +38,7 @@ object Utils {
   }
 
 
-  def getTable(tableName: TableName)(implicit context: SparkContext): HBaseTable = {
+  def getTable(tableName: TableName)(implicit context: SparkContext, reg: HKSREG): HBaseTableHKey = {
     val hbaseConfig = Utils.initConfig(context, HBaseConfiguration.create)
     val connection = ConnectionFactory.createConnection(hbaseConfig)
     try {
@@ -46,7 +48,7 @@ object Utils {
         try {
           val numRegions = regionLocator.getStartKeys.length
           val desc = admin.getTableDescriptor(tableName)
-          new HBaseTable(hbaseConfig, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*)
+          new HBaseTableHKey(hbaseConfig, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*)
         } finally {
           regionLocator.close
         }

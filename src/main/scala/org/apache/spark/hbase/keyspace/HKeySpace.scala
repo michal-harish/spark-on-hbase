@@ -1,25 +1,30 @@
-package org.apache.spark.hbase
+package org.apache.spark.hbase.keyspace
+
+import org.apache.spark.hbase.ByteUtils
+import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
+
+package object HKeySpaceRegistry {
+  type HKSREG = Map[Short, HKeySpace]
+}
 
 object HKeySpace {
-
   def apply(id: Array[Byte], offset: Int, length: Int): Short = {
     (((id(offset + 4) & 0xff) << 8) + (id(offset + 5) & 0xff)).toShort
   }
 
   def apply(idSpace: String): Short = idSpace.hashCode.toShort
 
-  def apply(idSpace: Short): HKeySpace = if (exists(idSpace)) mapping(idSpace) else throw new IllegalArgumentException
+  def apply(idSpace: Short)(implicit reg: HKSREG): HKeySpace = {
+    if (exists(idSpace)) reg(idSpace) else throw new IllegalArgumentException
+  }
 
-  def exists(idSpace: Short): Boolean = mapping.contains(idSpace)
-
-  private val mapping = scala.collection.mutable.HashMap[Short, HKeySpace]()
-
-  def register(keySpace: HKeySpace) = mapping += (keySpace.i -> keySpace)
+  def exists(idSpace: Short)(implicit reg: HKSREG): Boolean = {
+    reg.contains(idSpace)
+  }
 
 }
 
-
-abstract class HKeySpace(val symbol: String) {
+abstract class HKeySpace(val symbol: String) extends java.io.Serializable {
   val i = symbol.hashCode.toShort
 
   def asBytes(id: String): Array[Byte]
@@ -40,6 +45,7 @@ abstract class HKeySpace(val symbol: String) {
 
 class HKeySpaceUUID(symbol: String) extends HKeySpace(symbol) with KeySerdeUUID {
   override def asString(bytes: Array[Byte]): String = uuidToString(bytes, 6)
+
   override def asBytes(id: String): Array[Byte] = {
     val bytes = allocate(16)
     stringToUUID(id, 0, bytes, 6)
@@ -48,8 +54,9 @@ class HKeySpaceUUID(symbol: String) extends HKeySpace(symbol) with KeySerdeUUID 
   }
 }
 
-class HKeySpaceUUIDNumeric(symbol: String)  extends HKeySpace(symbol) with KeySerdeUUIDNumeric {
+class HKeySpaceUUIDNumeric(symbol: String) extends HKeySpace(symbol) with KeySerdeUUIDNumeric {
   override def asString(bytes: Array[Byte]): String = uuidToNumericString(bytes, 6)
+
   override def asBytes(id: String): Array[Byte] = {
     val bytes = allocate(16)
     stringToUUIDNumeric(id, 0, bytes, 6)
@@ -59,20 +66,20 @@ class HKeySpaceUUIDNumeric(symbol: String)  extends HKeySpace(symbol) with KeySe
 }
 
 
-
 class HKeySpaceString(symbol: String) extends HKeySpace(symbol) with KeySerdeString {
   override def asString(bytes: Array[Byte]): String = bytesToString(bytes, 6, bytes.length)
+
   override def asBytes(id: String): Array[Byte] = {
     val bytes = allocate(id.length)
     stringToBytes(id, 0, id.length, bytes, 6)
     ByteUtils.putIntValue(id.hashCode, bytes, 0)
     bytes
   }
-
 }
 
 class HKeySpaceLong(symbol: String) extends HKeySpace(symbol) with KeySerdeLong {
   override def asString(bytes: Array[Byte]): String = longBytesToString(bytes, 6)
+
   override def asBytes(id: String): Array[Byte] = {
     val bytes = allocate(8)
     longStringToBytes(id, bytes, 6)
@@ -83,6 +90,7 @@ class HKeySpaceLong(symbol: String) extends HKeySpace(symbol) with KeySerdeLong 
 
 class HKeySpaceLongPositive(symbol: String) extends HKeySpace(symbol) with KeySerdeLongPositive {
   override def asString(bytes: Array[Byte]): String = longPositiveBytesToString(bytes, 6)
+
   override def asBytes(id: String): Array[Byte] = {
     val bytes = allocate(8)
     longPositiveStringToBytes(id, bytes, 6)
@@ -94,13 +102,13 @@ class HKeySpaceLongPositive(symbol: String) extends HKeySpace(symbol) with KeySe
 trait KeySerdeUUID {
   val uuidPattern = "^(?i)[a-f0-9]{8}\\-[a-f0-9]{4}\\-[a-f0-9]{4}\\-[a-f0-9]{4}\\-[a-f0-9]{12}$".r.pattern
 
-  def stringToUUID(id:String, srcOffset: Int, dest: Array[Byte], destOffset: Int): Array[Byte] = {
+  def stringToUUID(id: String, srcOffset: Int, dest: Array[Byte], destOffset: Int): Array[Byte] = {
     if (uuidPattern.matcher(id).matches) ByteUtils.parseUUID(id.getBytes(), 1, srcOffset, dest, destOffset)
     else throw new IllegalArgumentException(s"UUID string format found: ${id}")
     dest
   }
 
-  def uuidToString(src: Array[Byte], srcOffset: Int) : String = {
+  def uuidToString(src: Array[Byte], srcOffset: Int): String = {
     ByteUtils.UUIDToString(src, srcOffset)
   }
 }
@@ -108,12 +116,12 @@ trait KeySerdeUUID {
 trait KeySerdeUUIDNumeric {
   val uuidPatternNumeric = "^(?i)[a-f0-9]{32}$".r.pattern
 
-  def stringToUUIDNumeric(id:String, srcOffset: Int, dest: Array[Byte], destOffset: Int) {
+  def stringToUUIDNumeric(id: String, srcOffset: Int, dest: Array[Byte], destOffset: Int) {
     if (uuidPatternNumeric.matcher(id).matches) ByteUtils.parseUUID(id.getBytes(), 0, srcOffset, dest, destOffset)
     else throw new IllegalArgumentException(s"Numeric UUID string format found: ${id}")
   }
 
-  def uuidToNumericString(src: Array[Byte], srcOffset: Int) : String = {
+  def uuidToNumericString(src: Array[Byte], srcOffset: Int): String = {
     ByteUtils.UUIDToNumericString(src, srcOffset)
   }
 }

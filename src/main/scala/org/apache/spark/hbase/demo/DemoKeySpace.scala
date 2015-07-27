@@ -1,6 +1,7 @@
 package org.apache.spark.hbase.demo
 
-import org.apache.spark.hbase.{KeySerdeUUIDNumeric, HKeySpace, ByteUtils}
+import org.apache.spark.hbase.keyspace.{KeySerdeUUIDNumeric, HKeySpace}
+import org.apache.spark.hbase.ByteUtils
 
 /**
  * Created by mharis on 23/07/15.

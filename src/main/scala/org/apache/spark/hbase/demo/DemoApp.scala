@@ -3,6 +3,8 @@ package org.apache.spark.hbase.demo
 import org.apache.hadoop.hbase.TableName
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
+import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
+import org.apache.spark.hbase.keyspace._
 import org.apache.spark.rdd.RDD
 
 object DemoApp extends App {
@@ -56,11 +58,11 @@ class DemoApp(sc: SparkContext) {
 
   implicit val context = sc
 
+  implicit val DemoHKeySapceReg = Map(new DemoKeySpace("d").keyValue)
+
   val graph = new HGraph("demo-graph", 256)
 
   implicit val partitioner = graph.partitioner
-
-  HKeySpace.register(new DemoKeySpace("d"))
 
   def help = {
     println("Spark-on-HBase Graph Demo shell help:")
@@ -88,7 +90,7 @@ class DemoApp(sc: SparkContext) {
       }))
   }
 
-  def open(hbaseTableName: String): HBaseTable = Utils.getTable(TableName.valueOf(hbaseTableName))
+  def open(hbaseTableName: String): HBaseTableHKey = Utils.getTable(TableName.valueOf(hbaseTableName))
 
 
   //  /**

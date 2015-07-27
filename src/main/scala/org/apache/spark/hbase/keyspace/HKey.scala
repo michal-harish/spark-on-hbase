@@ -1,6 +1,9 @@
-package org.apache.spark.hbase
+package org.apache.spark.hbase.keyspace
 
-class HKey(val keySpace: Short, val bytes: Array[Byte], val hash: Int)
+import org.apache.spark.hbase.ByteUtils
+import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
+
+class HKey(val keySpace: Short, val bytes: Array[Byte], val hash: Int)(implicit reg: HKSREG)
 extends java.io.Serializable with Ordered[HKey] {
   override def compareTo(that: HKey): Int = {
     ByteUtils.compare(this.bytes, 0, this.bytes.length, that.bytes, 0, that.bytes.length)
@@ -21,11 +24,11 @@ extends java.io.Serializable with Ordered[HKey] {
 
 object HKey {
 
-  def apply(keySpace: String, id: String): HKey = apply(HKeySpace(keySpace), id)
+  def apply(keySpace: String, id: String)(implicit reg: HKSREG): HKey = apply(HKeySpace(keySpace), id)
   
-  def apply(keySpace: Short, id: String): HKey = apply(HKeySpace(keySpace).asBytes(id))
+  def apply(keySpace: Short, id: String)(implicit reg: HKSREG): HKey = apply(HKeySpace(keySpace).asBytes(id))
 
-  def apply(key: Array[Byte]): HKey = {
+  def apply(key: Array[Byte])(implicit reg: HKSREG): HKey = {
     val keySpace: Short = HKeySpace(key, 0, key.length)
     new HKey(keySpace, key, ByteUtils.asIntValue(key))
   }
