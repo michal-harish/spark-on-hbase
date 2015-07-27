@@ -2,7 +2,6 @@ package org.apache.spark.hbase.demo
 
 import java.io.{OutputStreamWriter, BufferedWriter}
 
-import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase.{HBaseConfiguration, Cell, HConstants, CellUtil}
 import org.apache.hadoop.hbase.client.Result
@@ -294,31 +293,27 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
       .mapValues(CFREdge1S)
   }
 
-  def joinNet[R: ClassTag](rightSideRdd: LAYER[R], multi: Int): LAYER[(EDGES, R)] = {
-    val j = if (multi == -1) new HBaseJoinRangeScan[EDGES, R](cfNet) else new HBaseJoinMultiGet[EDGES, R](multi, cfNet)
-    j(CFREdges, rightSideRdd)
-  }
 
-  def outerJoinNet[R: ClassTag](rightSideRdd: LAYER[R], multi: Int): LAYER[(Option[EDGES], R)] = {
-    outerLookupNet(rightSideRdd.mapValues(x => (None, x)), multi)
-  }
+//  def joinNet[R: ClassTag](rightSideRdd: LAYER[R], multi: Int): LAYER[(EDGES, R)] = {
+//    TODO new HBaseRDDEdges(this).join(rightSideRdd:Layer[R]): LAYER[(EDGES, R)] = {.. }
+//  }
 
-  def outerLookupNet[R: ClassTag](rightSideRdd: LAYER[(Option[EDGES], R)], multi: Int): LAYER[(Option[EDGES], R)] = {
-    val j = /*TODO if (multi == -1) new HBaseLookupRangeScan[EDGES, R](cfNet) else */ new HBaseLookupMultiGet[EDGES, R](multi, cfNet)
-    j(CFREdges, rightSideRdd)
-  }
+//  def outerJoinNet[R: ClassTag](rightSideRdd: LAYER[R], multi: Int): LAYER[(Option[EDGES], R)] = {
+//    outerLookupNet(rightSideRdd.mapValues(x => (None, x)), multi)
+//  }
+//
+//  def outerLookupNet[R: ClassTag](rightSideRdd: LAYER[(Option[EDGES], R)], multi: Int): LAYER[(Option[EDGES], R)] = {
+//    val j = /*TODO if (multi == -1) new HBaseLookupRangeScan[EDGES, R](cfNet) else */ new HBaseLookupMultiGet[EDGES, R](multi, cfNet)
+//    j(CFREdges, rightSideRdd)
+//  }
 
-//  def get(vid: HKey*): Array[(HKey, EDGES, FEATURES)] = get(vid: _*).filter(_ != null).map(row => {
-//    (HKey(row.getRow), CFREdges(row), CFRFeatures(row))
-//  })
-
-  def filter[X: ClassTag](preSorted: Boolean, rdd: LAYER[X]): LAYER[X] = {
-    if (preSorted) {
-      new HBaseJoinRangeScan[EDGES, X](cfNet).apply(CFREdges, rdd).mapValues(_._2)
-    } else {
-      new HBaseJoinMultiGet[EDGES, X](10000, cfNet).apply(CFREdges, rdd).mapValues(_._2)
-    }
-  }
+//  def filter[X: ClassTag](preSorted: Boolean, rdd: LAYER[X]): LAYER[X] = {
+//    if (preSorted) {
+//      new HBaseJoinRangeScan[EDGES, X](cfNet).apply(CFREdges, rdd).mapValues(_._2)
+//    } else {
+//      new HBaseJoinMultiGet[EDGES, X](10000, cfNet).apply(CFREdges, rdd).mapValues(_._2)
+//    }
+//  }
 
   def loadPairs(update: PAIRS, completeAsync: Boolean = true): Long = {
     super.load(cfNet, reverse(update).mapValues{ case (vid, he) => Map(vid.bytes -> he.hbaseValue)}, completeAsync)
@@ -332,28 +327,28 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
     super.load(cfNet, updateNetRdd(rdd), completeAsync)
   }
 
-  def loadNet(bsp: BSP_RESULT,  completeAsync: Boolean): Unit = {
-    val (update, stats, history) = bsp
-    try {
-      loadNet(update.mapValues(_._2), completeAsync)
-    } finally {
-      stats.foreach({ case (superstep, stat) => println(s"BSP ${superstep} STATS ${stat.name} = ${stat.value}") })
-      history.foreach(_.unpersist(false))
-    }
-  }
+//  def loadNet(bsp: BSP_RESULT,  completeAsync: Boolean): Unit = {
+//    val (update, stats, history) = bsp
+//    try {
+//      loadNet(update.mapValues(_._2), completeAsync)
+//    } finally {
+//      stats.foreach({ case (superstep, stat) => println(s"BSP ${superstep} STATS ${stat.name} = ${stat.value}") })
+//      history.foreach(_.unpersist(false))
+//    }
+//  }
 
-  def remove(ids: HKey*)(implicit context: SparkContext): Long = {
-    val j = new HBaseJoinMultiGet[EDGES, HKey](1000, cfNet)
-    delete(cfNet, j(CFREdges, context.parallelize(ids.map(x => (x, null.asInstanceOf[HKey]))))
-      .flatMap { case (key, (edges, right)) => edges.map(e => (e._1, Set(key.bytes))) :+(key, Set(null.asInstanceOf[Array[Byte]])) }
-      .reduceByKey(_ ++ _).mapValues(_.toSeq)
-    )
-  }
-
-  def remove[T: ClassTag](ids: RDD[(HKey, T)],  completeAsync: Boolean = true): Long = {
-    val j = new HBaseJoinMultiGet[EDGES, HKey](1000, cfNet)
-    removeNet(j(CFREdges, ids.mapValues(x => null.asInstanceOf[HKey])).mapValues(_._1), completeAsync)
-  }
+//  def remove(ids: HKey*)(implicit context: SparkContext): Long = {
+//    val j = new HBaseJoinMultiGet[EDGES, HKey](1000, cfNet)
+//    delete(cfNet, j(CFREdges, context.parallelize(ids.map(x => (x, null.asInstanceOf[HKey]))))
+//      .flatMap { case (key, (edges, right)) => edges.map(e => (e._1, Set(key.bytes))) :+(key, Set(null.asInstanceOf[Array[Byte]])) }
+//      .reduceByKey(_ ++ _).mapValues(_.toSeq)
+//    )
+//  }
+//
+//  def remove[T: ClassTag](ids: RDD[(HKey, T)],  completeAsync: Boolean = true): Long = {
+//    val j = new HBaseJoinMultiGet[EDGES, HKey](1000, cfNet)
+//    removeNet(j(CFREdges, ids.mapValues(x => null.asInstanceOf[HKey])).mapValues(_._1), completeAsync)
+//  }
 
   def removeNet(rdd: NETWORK, completeAsync: Boolean = true): Long = {
     val d = rdd.flatMap { case (key, edges) => edges.map(e => (e._1, Set(key.bytes))) :+(key, Set(null.asInstanceOf[Array[Byte]])) }
@@ -361,96 +356,96 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
     bulkDelete(cfNet, d, completeAsync)
   }
 
-  /**
-   * This is a stateless BSP algorithm that propagates connection with deteriorating probabilities
-   * - it uses recursive RDD mapping without modifying HBase
-   * - state update is left to the caller by the returned rdd of 'suggested changes'.
-   * - it the RDD immutability and resiliency however
-   */
-  //---------(Key--(PrevState,-----Pending-Inbox)))
-  type BSP = (HKey, (Option[EDGES], (EDGES, EDGES)))
-  //----------------[(Key, (State, Update)]
-  type BSP_OUT = RDD[(HKey, (EDGES, EDGES))]
-  type BSP_RESULT = (BSP_OUT, STATS, HISTORY)
-
-  def incrementalNetBSP(adj: NETWORK, numSupersteps: Int = 9, multiGetSize: Int = 1000): BSP_RESULT = {
-    incrementalNetBSP(adj, new HBaseLookupMultiGet[EDGES, (EDGES, EDGES)](multiGetSize, cfNet), numSupersteps)
-  }
-
-  def incrementalNetBSP(adj: NETWORK, lookup: HBaseLookup[EDGES, (EDGES, EDGES)], numSteps: Int)
-                       (implicit context: SparkContext): BSP_RESULT = {
-    println(s"STATELESS BSP [${numSteps}-STEP]")
-    var transit: RDD[BSP] = adj.mapValues(x => (None, (Seq[EDGE](), x)))
-    var superstep = 0
-    val stats: STATS = LinkedHashMap[String, Accumulator[Long]]()
-    val history = new HISTORY
-    while (superstep < numSteps) {
-      superstep += 1
-      val statInbox = context.accumulator(0L, s"INBOX")
-      stats += (s"${superstep} INBOX" -> statInbox)
-      val statOutbox = context.accumulator(0L, s"OUTBOX")
-      stats += (s"${superstep} OUTBOX" -> statOutbox)
-      val input: RDD[BSP] = lookup(CFREdges, transit).mapValues {case (hbase, (pending, inbox)) => {
-        (hbase, (pending, inbox.filter { case (eid, ehe) => {
-          (hbase.get == null || !hbase.get.exists(p => p._1 == eid && p._2.probability >= ehe.probability))
-        }}))
-      }}
-      history += input.setName(s"${superstep} INPUT").persist(StorageLevel.MEMORY_AND_DISK_SER)
-      val superstepSnapshot = superstep
-      //input.collect.filter(_._2._2._2.size>0).foreach(x => println(s"${superstep} INBOX ${x._1} <- ${x._2._2._2}"))
-      val messages: RDD[BSP] = input.flatMap { case (vid, (hbase, (pending, newInbox))) => {
-        if (newInbox.size == 0 ) {
-          statOutbox += 1
-          Seq(((vid, (hbase, (pending, Seq.empty)))))
-        } else {
-          val builder = Seq.newBuilder[BSP]
-          //always transfer the inbox to the pending state and override pending with higher probabilities
-          statInbox += newInbox.size
-          builder += ((vid, (hbase, (pending.filter(p => {
-            !newInbox.exists(e => e._1 == p._1 && e._2.probability > p._2.probability)
-          }) ++ newInbox, Seq.empty))))
-
-          if (superstepSnapshot < numSteps) { //if this is the last superstep, no need to trigger further outbox
-          val existing = if (hbase.isDefined && hbase.get != null) hbase.get ++ pending else pending
-            if (existing.size > 0) {
-              existing.foreach { case (s, she) => builder += ((s, (None, (Seq.empty, newInbox.map {
-                case (eid, ehe) => (eid, HE(ehe.vendorCode, ehe.probability * she.probability, ehe.ts))
-              }))))
-              }
-              newInbox.foreach { case (i, ihe) => builder += ((i, (None, (Seq.empty, existing.map {
-                case (eid, ehe) => (eid, HE(ihe.vendorCode, ehe.probability * ihe.probability, ehe.ts))
-              }))))
-              }
-            }
-          }
-          val seq = builder.result
-          statOutbox += seq.size
-          seq
-        }
-      }
-      }
-      //messages.sortByKey().collect.foreach(x => println(s"${superstep} OUTBOX ${x}"))
-      //collapse messages - reduceByKey alternative
-      transit = messages.reduceByKey(partitioner, (e1: (Option[EDGES], (EDGES, EDGES)), e2: (Option[EDGES], (EDGES, EDGES))) => {
-        val hbase: Option[EDGES] = if (e1._1.isDefined) e1._1 else e2._1
-        val pending: EDGES = if (e1._2._1.isEmpty) e2._2._1 else e1._2._1
-        val inbox: EDGES =
-          e1._2._2.filter(e_1 =>
-            !e2._2._2.exists(e_2 => e_2._1 == e_1._1 && e_2._2.probability >= e_1._2.probability)
-              && !pending.exists(p => p._1 == e_1._1 && p._2.probability >= e_1._2.probability)
-              && (hbase.isEmpty || hbase.get == null || !hbase.get.exists(p => p._1 ==  e_1._1 && p._2.probability >= e_1._2.probability))
-          ) ++
-            e2._2._2.filter(e_2 => !e1._2._2.exists(e_1 => e_1._1 == e_2._1 && e_1._2.probability > e_2._2.probability)
-              && !pending.exists(p => p._1 == e_2._1 && p._2.probability >= e_2._2.probability)
-              && (hbase.isEmpty || hbase.get == null || !hbase.get.exists(p => p._1 ==  e_2._1 && p._2.probability >= e_2._2.probability))
-            )
-        (hbase, (pending, inbox))
-      })
-    }
-    val output: BSP_OUT = transit.mapValues { case (state, (pending, inbox)) =>
-      (if (state.isEmpty || state.get == null) Seq() else state.get, pending)
-    }
-    output.setName(s"BSP Final Output")
-    (output, stats, history)
-  }
+//  /**
+//   * This is a stateless BSP algorithm that propagates connection with deteriorating probabilities
+//   * - it uses recursive RDD mapping without modifying HBase
+//   * - state update is left to the caller by the returned rdd of 'suggested changes'.
+//   * - it the RDD immutability and resiliency however
+//   */
+//  //---------(Key--(PrevState,-----Pending-Inbox)))
+//  type BSP = (HKey, (Option[EDGES], (EDGES, EDGES)))
+//  //----------------[(Key, (State, Update)]
+//  type BSP_OUT = RDD[(HKey, (EDGES, EDGES))]
+//  type BSP_RESULT = (BSP_OUT, STATS, HISTORY)
+//
+//  def incrementalNetBSP(adj: NETWORK, numSupersteps: Int = 9, multiGetSize: Int = 1000): BSP_RESULT = {
+//    incrementalNetBSP(adj, new HBaseLookupMultiGet[EDGES, (EDGES, EDGES)](multiGetSize, cfNet), numSupersteps)
+//  }
+//
+//  def incrementalNetBSP(adj: NETWORK, lookup: HBaseLookup[EDGES, (EDGES, EDGES)], numSteps: Int)
+//                       (implicit context: SparkContext): BSP_RESULT = {
+//    println(s"STATELESS BSP [${numSteps}-STEP]")
+//    var transit: RDD[BSP] = adj.mapValues(x => (None, (Seq[EDGE](), x)))
+//    var superstep = 0
+//    val stats: STATS = LinkedHashMap[String, Accumulator[Long]]()
+//    val history = new HISTORY
+//    while (superstep < numSteps) {
+//      superstep += 1
+//      val statInbox = context.accumulator(0L, s"INBOX")
+//      stats += (s"${superstep} INBOX" -> statInbox)
+//      val statOutbox = context.accumulator(0L, s"OUTBOX")
+//      stats += (s"${superstep} OUTBOX" -> statOutbox)
+//      val input: RDD[BSP] = lookup(CFREdges, transit).mapValues {case (hbase, (pending, inbox)) => {
+//        (hbase, (pending, inbox.filter { case (eid, ehe) => {
+//          (hbase.get == null || !hbase.get.exists(p => p._1 == eid && p._2.probability >= ehe.probability))
+//        }}))
+//      }}
+//      history += input.setName(s"${superstep} INPUT").persist(StorageLevel.MEMORY_AND_DISK_SER)
+//      val superstepSnapshot = superstep
+//      //input.collect.filter(_._2._2._2.size>0).foreach(x => println(s"${superstep} INBOX ${x._1} <- ${x._2._2._2}"))
+//      val messages: RDD[BSP] = input.flatMap { case (vid, (hbase, (pending, newInbox))) => {
+//        if (newInbox.size == 0 ) {
+//          statOutbox += 1
+//          Seq(((vid, (hbase, (pending, Seq.empty)))))
+//        } else {
+//          val builder = Seq.newBuilder[BSP]
+//          //always transfer the inbox to the pending state and override pending with higher probabilities
+//          statInbox += newInbox.size
+//          builder += ((vid, (hbase, (pending.filter(p => {
+//            !newInbox.exists(e => e._1 == p._1 && e._2.probability > p._2.probability)
+//          }) ++ newInbox, Seq.empty))))
+//
+//          if (superstepSnapshot < numSteps) { //if this is the last superstep, no need to trigger further outbox
+//          val existing = if (hbase.isDefined && hbase.get != null) hbase.get ++ pending else pending
+//            if (existing.size > 0) {
+//              existing.foreach { case (s, she) => builder += ((s, (None, (Seq.empty, newInbox.map {
+//                case (eid, ehe) => (eid, HE(ehe.vendorCode, ehe.probability * she.probability, ehe.ts))
+//              }))))
+//              }
+//              newInbox.foreach { case (i, ihe) => builder += ((i, (None, (Seq.empty, existing.map {
+//                case (eid, ehe) => (eid, HE(ihe.vendorCode, ehe.probability * ihe.probability, ehe.ts))
+//              }))))
+//              }
+//            }
+//          }
+//          val seq = builder.result
+//          statOutbox += seq.size
+//          seq
+//        }
+//      }
+//      }
+//      //messages.sortByKey().collect.foreach(x => println(s"${superstep} OUTBOX ${x}"))
+//      //collapse messages - reduceByKey alternative
+//      transit = messages.reduceByKey(partitioner, (e1: (Option[EDGES], (EDGES, EDGES)), e2: (Option[EDGES], (EDGES, EDGES))) => {
+//        val hbase: Option[EDGES] = if (e1._1.isDefined) e1._1 else e2._1
+//        val pending: EDGES = if (e1._2._1.isEmpty) e2._2._1 else e1._2._1
+//        val inbox: EDGES =
+//          e1._2._2.filter(e_1 =>
+//            !e2._2._2.exists(e_2 => e_2._1 == e_1._1 && e_2._2.probability >= e_1._2.probability)
+//              && !pending.exists(p => p._1 == e_1._1 && p._2.probability >= e_1._2.probability)
+//              && (hbase.isEmpty || hbase.get == null || !hbase.get.exists(p => p._1 ==  e_1._1 && p._2.probability >= e_1._2.probability))
+//          ) ++
+//            e2._2._2.filter(e_2 => !e1._2._2.exists(e_1 => e_1._1 == e_2._1 && e_1._2.probability > e_2._2.probability)
+//              && !pending.exists(p => p._1 == e_2._1 && p._2.probability >= e_2._2.probability)
+//              && (hbase.isEmpty || hbase.get == null || !hbase.get.exists(p => p._1 ==  e_2._1 && p._2.probability >= e_2._2.probability))
+//            )
+//        (hbase, (pending, inbox))
+//      })
+//    }
+//    val output: BSP_OUT = transit.mapValues { case (state, (pending, inbox)) =>
+//      (if (state.isEmpty || state.get == null) Seq() else state.get, pending)
+//    }
+//    output.setName(s"BSP Final Output")
+//    (output, stats, history)
+//  }
 }

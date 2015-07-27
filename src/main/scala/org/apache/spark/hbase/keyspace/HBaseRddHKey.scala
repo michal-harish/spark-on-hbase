@@ -5,7 +5,7 @@ import org.apache.hadoop.hbase.filter._
 import org.apache.hadoop.hbase.util.Pair
 import org.apache.hadoop.hbase.{HConstants, TableName}
 import org.apache.spark.SparkContext
-import org.apache.spark.hbase.HBaseRdd
+import org.apache.spark.hbase.HBaseRDD
 import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
 
 import scala.collection.JavaConverters._
@@ -32,7 +32,7 @@ class HBaseRddHKey(sc: SparkContext
                , minStamp: Long
                , maxStamp: Long
                , columns: String*
-                )(implicit reg: HKSREG) extends HBaseRdd[HKey, Result](sc, tableName, minStamp, maxStamp) {
+                )(implicit reg: HKSREG) extends HBaseRDD[HKey, Result](sc, tableName, minStamp, maxStamp) {
 
   def this(sc: SparkContext, tableName: TableName, columns: String*)(implicit reg: HKSREG)
   = this(sc, tableName, -1.toShort, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
@@ -43,6 +43,12 @@ class HBaseRddHKey(sc: SparkContext
   def this(sc: SparkContext, tableName: TableName, idSpace: Short, columns: String*)(implicit reg: HKSREG)
   = this(sc, tableName, idSpace, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
 
+  override def bytesToKey = (rowKey: Array[Byte]) => HKey(rowKey)
+
+  override def keyToBytes = (key: HKey) => key.bytes
+
+  override def resultToValue = (row: Result) => row
+
   override protected def getRegionScan(region: Int): Scan = {
     val scan = super.getRegionScan(region)
     if (idSpace != -1) {
@@ -52,9 +58,5 @@ class HBaseRddHKey(sc: SparkContext
     }
     scan
   }
-
-  override protected def bytesToKey = (rowKey: Array[Byte]) => HKey(rowKey)
-  
-  override protected def mapValue = (row: Result) => row
 
 }

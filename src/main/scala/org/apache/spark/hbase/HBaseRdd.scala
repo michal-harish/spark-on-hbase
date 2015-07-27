@@ -5,26 +5,45 @@ import org.apache.hadoop.hbase.{HBaseConfiguration, HConstants, TableName}
 import org.apache.hadoop.hbase.util.{Pair, Bytes}
 import org.apache.spark.{SerializableWritable, TaskContext, Partition, SparkContext}
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{PairRDDFunctions, RDD}
 import org.apache.hadoop.hbase.client._
+
+import scala.reflect.ClassTag
 
 /**
  * Created by mharis on 26/07/15.
  */
-abstract class HBaseRdd[K, V](sc: SparkContext
+object HBaseRDD {
+  implicit def hBaseRddToPairRDDFunctions[K, V](rdd: HBaseRDD[K, V])
+     (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null): HBaseRDDFunctions[K, V] = {
+    new HBaseRDDFunctions(rdd)
+  }
+}
+
+abstract class HBaseRDD[K, V](sc: SparkContext
                , @transient val tableName: TableName
                , val minStamp: Long
                , val maxStamp: Long
                , val columns: String*) extends RDD[(K, V)](sc, Nil) {
 
-  @transient private val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
-  protected val tableNameAsString = tableName.toString
+  def this(sc: SparkContext, tableName: TableName) = this(sc, tableName, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP)
+
+  val tableNameAsString = tableName.toString
+
+  val cf: Seq[Array[Byte]] = columns.map(_ match {
+    case cf: String if (!cf.contains(':')) => Bytes.toBytes(cf)
+    case column: String => column.split(":") match { case Array(cf, qualifier) => Bytes.toBytes(cf)}
+  })
+
+  @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
   protected val configuration = new SerializableWritable(hbaseConf)
   protected val regionSplits: Array[(Array[Byte], Array[Byte])] = Utils.getRegionSplits(hbaseConf, tableName)
 
-  protected def bytesToKey: Array[Byte] => K
+  def bytesToKey: Array[Byte] => K
 
-  protected def mapValue: Result => V
+  def keyToBytes: K => Array[Byte]
+
+  def resultToValue: Result => V
 
   protected def getRegionScan(region: Int): Scan = {
     val scan = new Scan()
@@ -87,7 +106,7 @@ abstract class HBaseRdd[K, V](sc: SparkContext
             connection.close
             false
           } else {
-            current = Some((bytesToKey(result.getRow), mapValue(result)))
+            current = Some((bytesToKey(result.getRow), resultToValue(result)))
             true
           }
         } else {

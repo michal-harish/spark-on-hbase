@@ -24,17 +24,6 @@ class HBaseTableHKey(hbaConf: Configuration, tableNameAsString: String, numberOf
   override protected def keyToBytes = (key: HKey) => key.bytes
   protected def bytesToKey = (bytes: Array[Byte]) => HKey(bytes)
 
-
-  def rdd()(implicit context: SparkContext): RDD[(HKey, Result)] = new HBaseRddHKey(context, tableName)
-
-  def rdd(cf: Array[Byte], maxStamp: Long)(implicit context: SparkContext): RDD[(HKey, Result)] = {
-    new HBaseRddHKey(context, tableName, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf))
-  }
-
-  def rdd(columns: String*)(implicit context: SparkContext): RDD[(HKey, Result)] = {
-    new HBaseRddHKey(context, tableName, columns: _*)
-  }
-
   def rdd(keyIdSpace: Short, columns: String*)(implicit context: SparkContext): RDD[(HKey, Result)] = {
     new HBaseRddHKey(context, tableName, keyIdSpace, columns: _*)
   }
@@ -43,16 +32,5 @@ class HBaseTableHKey(hbaConf: Configuration, tableNameAsString: String, numberOf
     new HBaseRddHKey(context, tableName, keyIdSpace, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf))
   }
 
-  final def get(vid: HKey*): Array[Result] = {
-    val connection = ConnectionFactory.createConnection(hbaConf)
-    try {
-      val table = connection.getTable(TableName.valueOf(tableNameAsString))
-      val result = multiget(table, vid.map(_.bytes), Seq())
-      table.close
-      result
-    } finally {
-      connection.close
-    }
-  }
 
 }

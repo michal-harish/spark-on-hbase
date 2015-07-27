@@ -38,27 +38,27 @@ object Utils {
   }
 
 
-  def getTable(tableName: TableName)(implicit context: SparkContext, reg: HKSREG): HBaseTableHKey = {
-    val hbaseConfig = Utils.initConfig(context, HBaseConfiguration.create)
-    val connection = ConnectionFactory.createConnection(hbaseConfig)
-    try {
-      val admin = connection.getAdmin
-      try {
-        val regionLocator = connection.getRegionLocator(tableName)
-        try {
-          val numRegions = regionLocator.getStartKeys.length
-          val desc = admin.getTableDescriptor(tableName)
-          new HBaseTableHKey(hbaseConfig, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*)
-        } finally {
-          regionLocator.close
-        }
-      } finally {
-        admin.close
-      }
-    } finally {
-      connection.close
-    }
-  }
+//  def getTable(tableName: TableName)(implicit context: SparkContext, reg: HKSREG): HBaseTableHKey = {
+//    val hbaseConfig = Utils.initConfig(context, HBaseConfiguration.create)
+//    val connection = ConnectionFactory.createConnection(hbaseConfig)
+//    try {
+//      val admin = connection.getAdmin
+//      try {
+//        val regionLocator = connection.getRegionLocator(tableName)
+//        try {
+//          val numRegions = regionLocator.getStartKeys.length
+//          val desc = admin.getTableDescriptor(tableName)
+//          new HBaseTableHKey(hbaseConfig, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*)
+//        } finally {
+//          regionLocator.close
+//        }
+//      } finally {
+//        admin.close
+//      }
+//    } finally {
+//      connection.close
+//    }
+//  }
 
   def getNumRegions(hbaseConf: Configuration, tableName: TableName) = {
     val connection = ConnectionFactory.createConnection(hbaseConf)

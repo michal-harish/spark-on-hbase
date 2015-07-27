@@ -1,6 +1,7 @@
 package org.apache.spark.hbase.demo
 
-import org.apache.hadoop.hbase.TableName
+import org.apache.hadoop.hbase.client.{Result, ConnectionFactory}
+import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
 import org.apache.spark.hbase.keyspace._
@@ -57,7 +58,10 @@ class DemoApp(sc: SparkContext) {
 
   implicit val context = sc
 
-  implicit val DemoHKeySapceReg = Map(new DemoKeySpace("d").keyValue)
+  implicit val DemoHKeySapceReg = Map(
+    new DemoKeySpace("d").keyValue,
+    new HKeySpaceUUID("u").keyValue
+  )
 
   val graph = new HGraph("demo-graph", 256)
 
@@ -66,9 +70,38 @@ class DemoApp(sc: SparkContext) {
   def help = {
     println("Spark-on-HBase Graph Demo shell help:")
     println(" help - print this usage information")
-    println(" open(<hbaseTableName>) - get a HTableInstance for a hbase table")
-    println(" graph - default demo instance of HGraph (extension of HBaseTable) ")
+    println(" open(<hbaseTableName>) - get a basic HBaseTable for any existing table for which key bytes can be represented as Sring")
+    println(" graph - reference to the main graph instance (HGraph extends HBaseTable) ")
+    println(" graph.createIfNotExists - create the undelying HBase table")
   }
+
+  def open(hbaseTableName: String): HBaseTable[String] = {
+    val tableName = TableName.valueOf(hbaseTableName)
+    val hbaseConfig = Utils.initConfig(context, HBaseConfiguration.create)
+    val connection = ConnectionFactory.createConnection(hbaseConfig)
+    try {
+      val admin = connection.getAdmin
+      try {
+        val regionLocator = connection.getRegionLocator(tableName)
+        try {
+          val numRegions = regionLocator.getStartKeys.length
+          val desc = admin.getTableDescriptor(tableName)
+          new HBaseTable[String](hbaseConfig, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*) {
+            override protected def keyToBytes = (rowKey: String) => rowKey.getBytes
+            override protected def bytesToKey = (key: Array[Byte]) => new String(key)
+          }
+        } finally {
+          regionLocator.close
+        }
+      } finally {
+        admin.close
+      }
+    } finally {
+      connection.close
+    }
+  }
+
+
 
   /**
    * From an adjacency lists represented as coma-separated ids to a redundant NETWORK
@@ -88,10 +121,6 @@ class DemoApp(sc: SparkContext) {
         for (id <- a) yield ((id, sortedEdges.filter(_._1 != id)))
       }))
   }
-
-  def open(hbaseTableName: String): HBaseTableHKey = Utils.getTable(TableName.valueOf(hbaseTableName))
-
-
   //  /**
   //   * Used for post-splitting. Because we manage region splits manually when the table grows large
   //   * we need to 1) create new table with more regions 2) copy the old table to the new one
