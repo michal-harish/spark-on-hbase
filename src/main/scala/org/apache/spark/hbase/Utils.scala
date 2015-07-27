@@ -4,18 +4,17 @@ import java.io.ByteArrayOutputStream
 
 import com.esotericsoftware.kryo.io.Input
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileStatus, Path, FileSystem}
-import org.apache.hadoop.hbase.{HBaseConfiguration, HColumnDescriptor, TableName}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.apache.hadoop.hbase.client.ConnectionFactory
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
+import org.apache.hadoop.hbase.{HColumnDescriptor, TableName}
 import org.apache.hadoop.io.{BytesWritable, NullWritable}
 import org.apache.spark.SparkContext
-import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
-import org.apache.spark.hbase.keyspace.{HBaseTableHKey, HKey}
+import org.apache.spark.hbase.keyspace.HKey
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
-import scala.collection.JavaConverters._
+
 import scala.reflect.ClassTag
 
 /**
@@ -36,29 +35,6 @@ object Utils {
     }
     config
   }
-
-
-//  def getTable(tableName: TableName)(implicit context: SparkContext, reg: HKSREG): HBaseTableHKey = {
-//    val hbaseConfig = Utils.initConfig(context, HBaseConfiguration.create)
-//    val connection = ConnectionFactory.createConnection(hbaseConfig)
-//    try {
-//      val admin = connection.getAdmin
-//      try {
-//        val regionLocator = connection.getRegionLocator(tableName)
-//        try {
-//          val numRegions = regionLocator.getStartKeys.length
-//          val desc = admin.getTableDescriptor(tableName)
-//          new HBaseTableHKey(hbaseConfig, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*)
-//        } finally {
-//          regionLocator.close
-//        }
-//      } finally {
-//        admin.close
-//      }
-//    } finally {
-//      connection.close
-//    }
-//  }
 
   def getNumRegions(hbaseConf: Configuration, tableName: TableName) = {
     val connection = ConnectionFactory.createConnection(hbaseConf)

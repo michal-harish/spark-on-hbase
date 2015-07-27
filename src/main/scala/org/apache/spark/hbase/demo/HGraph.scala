@@ -1,21 +1,20 @@
 package org.apache.spark.hbase.demo
 
-import java.io.{OutputStreamWriter, BufferedWriter}
+import java.io.{BufferedWriter, OutputStreamWriter}
 
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.hbase.{HBaseConfiguration, Cell, HConstants, CellUtil}
 import org.apache.hadoop.hbase.client.Result
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
-import org.apache.spark.hbase.keyspace.{HBaseTableHKey, HKeySpace, HKey}
-import org.apache.spark.{SparkContext, Accumulator}
+import org.apache.hadoop.hbase.{Cell, CellUtil, HBaseConfiguration, HConstants}
 import org.apache.spark.hbase._
+import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
+import org.apache.spark.hbase.keyspace.{HBaseTableHKey, HKey, HKeySpace}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
+import org.apache.spark.{Accumulator, SparkContext}
 
-import scala.collection.mutable.{LinkedHashMap, MutableList}
+import scala.collection.mutable.LinkedHashMap
 import scala.reflect.ClassTag
 
 /**
@@ -95,8 +94,8 @@ class HE(val bytes: Array[Byte], val vendorCode: Short, val ts: Long) extends ja
 }
 
 
-class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkContext, reg: HKSREG)
-  extends HBaseTableHKey(Utils.initConfig(context, HBaseConfiguration.create), tableName: String, numberOfRegions
+class HGraph(sc: SparkContext, tableName: String, numberOfRegions: Int)(implicit reg: HKSREG)
+  extends HBaseTableHKey(sc, tableName: String, numberOfRegions
   , Utils.column(Bytes.toBytes("N"), true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
   , Utils.column(Bytes.toBytes("E"), true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
   , Utils.column(Bytes.toBytes("F"), false, 86400 * 90, BloomType.ROWCOL, 1, Algorithm.SNAPPY, 64 * 1024))
@@ -113,7 +112,7 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
   val propsFile = new Path(s"/hgraph/${tableName}") //TODO configurable path for hgraph properties
   val props = scala.collection.mutable.LinkedHashMap[String, String]()
 
-  val CFRFeatures: CFR[FEATURES] = (row: Result) => {
+  val CFRFeatures = (row: Result) => {
     val featureMapBuilder = Map.newBuilder[String, Array[Byte]]
     val scanner = row.cellScanner
     val cfFeatures = Bytes.toBytes("F")
@@ -128,7 +127,7 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
     featureMapBuilder.result
   }
 
-  val CFREdges: CFR[EDGES] = (row: Result) => {
+  val CFREdges = (row: Result) => {
     val edgeSeqBuilder = Seq.newBuilder[(HKey, HE)]
     val scanner = row.cellScanner
     val cfNet = Bytes.toBytes("N")
@@ -148,7 +147,7 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
   def end_date = props("end_date")
 
   def loadProperties = {
-    val fs = FileSystem.get(hbaConf)
+    val fs = FileSystem.get(hbaseConf)
     try {
       val stream = fs.open(propsFile)
       props ++= scala.io.Source.fromInputStream(stream).getLines.map(_.split("=")).filter(_.size == 2).map(x => (x(0), x(1)))
@@ -163,7 +162,7 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
 
   def updateProperties(set: (String, String)*) = {
     props ++= set
-    val fs = FileSystem.get(hbaConf)
+    val fs = FileSystem.get(hbaseConf)
     fs.makeQualified(propsFile)
     val stream = new BufferedWriter(new OutputStreamWriter(fs.create(propsFile, true)))
     props.map(x => s"${x._1}=${x._2}").toSeq.foreach(line => stream.write(line + "\r\n"))
@@ -223,7 +222,7 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
 
   def rddNumEdges(beforeTimestamp: Long = HConstants.LATEST_TIMESTAMP): LAYER[Long] = {
     val cfNet = Bytes.toBytes("N")
-    val CFRNumEdges: CFR[Long] = (row: Result) => {
+    val CFRNumEdges = (row: Result) => {
       val scanner = row.cellScanner
       var numEdges = 0L
       while (scanner.advance) numEdges += 1L
@@ -252,7 +251,7 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
   def rddPool(idSpace: String, beforeTimestamp: Long = HConstants.LATEST_TIMESTAMP): POOL = {
     val cfNet = this.cfNet
     val sIdSpace = HKeySpace(idSpace)
-    val CFRMaxVid1S: CFR[HKey] = (row: Result) => {
+    val CFRMaxVid1S = (row: Result) => {
       val scanner = row.cellScanner
       var selectedCell: Cell = null
       while (scanner.advance) {
@@ -276,7 +275,7 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
     val cfNet = this.cfNet
     val sIdSpace = HKeySpace(idSpace)
     val allSpaces = idSpace == "*"
-    val CFREdge1S: CFR[EDGES] = (row: Result) => {
+    val CFREdge1S = (row: Result) => {
       val edgeSeqBuilder = Seq.newBuilder[(HKey, HE)]
       val scanner = row.cellScanner
       while (scanner.advance) {
@@ -316,7 +315,7 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
 //  }
 
   def loadPairs(update: PAIRS, completeAsync: Boolean = true): Long = {
-    super.load(cfNet, reverse(update).mapValues{ case (vid, he) => Map(vid.bytes -> he.hbaseValue)}, completeAsync)
+    super.bulkLoad(cfNet, reverse(update).mapValues{ case (vid, he) => Map(vid.bytes -> he.hbaseValue)}, completeAsync)
   }
 
   def updateNetRdd(update: NETWORK) = update.mapValues(_.map { case (vid, he) => (vid.bytes, he.hbaseValue) }.toMap)
@@ -324,7 +323,7 @@ class HGraph(tableName: String, numberOfRegions: Int)(implicit context: SparkCon
   def updateNet(rdd: NETWORK): Long = super.update(cfNet, updateNetRdd(rdd))
 
   def loadNet(rdd: NETWORK, completeAsync: Boolean = true): Long = {
-    super.load(cfNet, updateNetRdd(rdd), completeAsync)
+    super.bulkLoad(cfNet, updateNetRdd(rdd), completeAsync)
   }
 
 //  def loadNet(bsp: BSP_RESULT,  completeAsync: Boolean): Unit = {

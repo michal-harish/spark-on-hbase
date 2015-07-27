@@ -1,41 +1,38 @@
 package org.apache.spark.hbase
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.hbase.{HBaseConfiguration, HConstants, TableName}
-import org.apache.hadoop.hbase.util.{Pair, Bytes}
-import org.apache.spark.{SerializableWritable, TaskContext, Partition, SparkContext}
-import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.rdd.{PairRDDFunctions, RDD}
 import org.apache.hadoop.hbase.client._
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.hadoop.hbase.{HBaseConfiguration, HConstants, TableName}
+import org.apache.spark.annotation.DeveloperApi
+import org.apache.spark.rdd.RDD
+import org.apache.spark.{Partition, SerializableWritable, SparkContext, TaskContext}
 
 import scala.reflect.ClassTag
 
 /**
  * Created by mharis on 26/07/15.
  */
-object HBaseRDD {
-  implicit def hBaseRddToPairRDDFunctions[K, V](rdd: HBaseRDD[K, V])
-     (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null): HBaseRDDFunctions[K, V] = {
-    new HBaseRDDFunctions(rdd)
-  }
-}
 
-abstract class HBaseRDD[K, V](sc: SparkContext
-               , @transient val tableName: TableName
-               , val minStamp: Long
-               , val maxStamp: Long
-               , val columns: String*) extends RDD[(K, V)](sc, Nil) {
+abstract class HBaseRDD[K, V](  @transient private val sc: SparkContext
+                              , @transient private val tableName: TableName
+                              , val minStamp: Long
+                              , val maxStamp: Long
+                              , val columns: String*) extends RDD[(K, V)](sc, Nil) {
+
+  @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
+  protected val configuration = new SerializableWritable(hbaseConf)
+  protected val regionSplits: Array[(Array[Byte], Array[Byte])] = Utils.getRegionSplits(hbaseConf, tableName)
 
   val tableNameAsString = tableName.toString
 
   val cf: Seq[Array[Byte]] = columns.map(_ match {
     case cf: String if (!cf.contains(':')) => Bytes.toBytes(cf)
-    case column: String => column.split(":") match { case Array(cf, qualifier) => Bytes.toBytes(cf)}
+    case column: String => column.split(":") match {
+      case Array(cf, qualifier) => Bytes.toBytes(cf)
+    }
   })
 
-  @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
-  protected val configuration = new SerializableWritable(hbaseConf)
-  protected val regionSplits: Array[(Array[Byte], Array[Byte])] = Utils.getRegionSplits(hbaseConf, tableName)
 
   def bytesToKey: Array[Byte] => K
 
@@ -113,5 +110,12 @@ abstract class HBaseRDD[K, V](sc: SparkContext
         }
       }
     }
+  }
+}
+
+object HBaseRDD {
+  implicit def hBaseRddToPairRDDFunctions[K, V](rdd: HBaseRDD[K, V])
+       (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null): HBaseRDDFunctions[K, V] = {
+    new HBaseRDDFunctions[K, V](rdd)
   }
 }

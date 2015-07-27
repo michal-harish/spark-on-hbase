@@ -5,54 +5,34 @@ import java.util
 import org.apache.hadoop.hbase.TableName
 import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.{SerializableWritable, Partitioner}
-import org.apache.spark.rdd.{RDD, PairRDDFunctions}
+import org.apache.spark.SerializableWritable
+import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
 /**
  * Created by mharis on 27/07/15.
+ *
+ * Functions available for HBaseRDD via implicit conversions
  */
 
-trait HBaseRDDTypes[K,V] {
-  /**
-   * CFR = ColumnFamilyReader - a generic type of a function that maps hbase result to T
-   */
-  type CFR[T] = Result => T
-
-  /**
-   * HBaseJoin is an abstract function that joins another RDD with this table's RDD representation
-   * - several implementations are avialble for different proportions of left and right tables
-   */
-  abstract class HBaseJoin[L, R] extends Function2[CFR[L], RDD[(K, R)], RDD[(K, (L, R))]]
-
-  /**
-   * HBaseLookup is a further optimisation of HBaseJoin for highly-iterative usecases like graph algorithms
-   * where the already looked-up values can be cached and only as the algorithm 'explores' the underlying table
-   * the new values are looked up - again multiple variants are implemented below
-   */
-  abstract class HBaseLookup[L, R] extends Function2[CFR[L], RDD[(K, (Option[L], R))], RDD[(K, (Option[L], R))]]
-}
-
-class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt: ClassTag[V])
-  extends PairRDDFunctions[K,V](self)
-  with HBaseRDDTypes[K,V]
-{
+class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt: ClassTag[V]) extends Serializable {
 
   //TODO make sure we understand what self.withScope does
-  override def join[W](other: RDD[(K, W)], partitioner: Partitioner): RDD[(K, (V, W))] = self.withScope {
-    val j = if (multiGetSize == -1) new HBaseJoinRangeScan[V, W](self.cf:_*) else new HBaseJoinMultiGet[V, W](1000, self.cf:_*)
+  def join[W](other: RDD[(K, W)]): RDD[(K, (V, W))] = self.withScope {
+    val j = if (multiGetSize == -1) new HBaseJoinRangeScan[W](self.cf: _*) else new HBaseJoinMultiGet[W](1000, self.cf: _*)
     j(self.resultToValue, other)
-    //TODO if partitioner is not equal to the self.partitioner add .partitionBy
+    //TODO partitioner optional argument - if is not equal to the self.partitioner add .partitionBy(partitioner)
   }
 
-  def lookup[W](other: RDD[(K, (Option[V], W))]) : RDD[(K, (Option[V], W))] = {
-    val l = new HBaseLookupMultiGet[V, W](1000, self.cf:_*)
+  def lookup[W](other: RDD[(K, (Option[V], W))]): RDD[(K, (Option[V], W))] = self.withScope {
+    val l = new HBaseLookupMultiGet[W](multiGetSize, self.cf: _*)
     l(self.resultToValue, other)
   }
 
   val multiGetSize = 1000 // TODO make multiGetSize configurable
+
   val multiget = (table: Table, rowKeys: Iterable[Array[Byte]], cf: Seq[Array[Byte]]) => {
     val multiGetList = new util.ArrayList[Get]()
     for (keyBytes <- rowKeys) {
@@ -64,8 +44,14 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
     table.get(multiGetList)
   }: Array[Result]
 
-  final class HBaseJoinMultiGet[L, R](val maxGetSize: Int, val cf: Array[Byte]*) extends HBaseJoin[L, R] {
-    def apply(cfr: CFR[L], rightSideRdd: RDD[(K, R)]): RDD[(K, (L, R))] = {
+  /**
+   * HBaseJoin is an abstract function that joins another RDD with this table's RDD representation
+   * - several implementations are avialble for different proportions of left and right tables
+   */
+  abstract class HBaseJoin[W] extends Function2[Result => V, RDD[(K, W)], RDD[(K, (V, W))]]
+
+  final class HBaseJoinMultiGet[W](val maxGetSize: Int, val cf: Array[Byte]*) extends HBaseJoin[W] {
+    def apply(cfr: Result => V, rightSideRdd: RDD[(K, W)]): RDD[(K, (V, W))] = {
       val cf = this.cf
       val broadCastConf = new SerializableWritable(self.hbaseConf)
       val tableNameAsString = self.tableNameAsString
@@ -76,8 +62,8 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
       rightSideRdd.mapPartitions(part => {
         val connection = ConnectionFactory.createConnection(broadCastConf.value)
         val table = connection.getTable(TableName.valueOf(tableNameAsString))
-        new Iterator[(K, (L, R))] {
-          var buffer: Option[Iterator[(K, (L, R))]] = None
+        new Iterator[(K, (V, W))] {
+          var buffer: Option[Iterator[(K, (V, W))]] = None
 
           override def hasNext: Boolean = buffer match {
             case None => loadBufferedIterator
@@ -87,7 +73,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
             }
           }
 
-          override def next(): (K, (L, R)) = buffer match {
+          override def next(): (K, (V, W)) = buffer match {
             case Some(i) => i.next
             case None => loadBufferedIterator match {
               case true => buffer.get.next
@@ -117,14 +103,14 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
             }
           }
 
-          private def multiGetWithAtLeastOneResult: Option[Iterator[(K, (L, R))]] = {
+          private def multiGetWithAtLeastOneResult: Option[Iterator[(K, (V, W))]] = {
             while (part.hasNext) {
               val multiGetList = mutable.MutableList[Array[Byte]]()
-              val bufferMap = scala.collection.mutable.Map[K, (L, R)]()
+              val bufferMap = scala.collection.mutable.Map[K, (V, W)]()
               while (multiGetList.size < multiGetSize && part.hasNext) {
                 val (vid, rightSideValue) = part.next
                 multiGetList += keyToBytes(vid)
-                bufferMap(vid) = ((null.asInstanceOf[L], rightSideValue))
+                bufferMap(vid) = ((null.asInstanceOf[V], rightSideValue))
               }
               if (!multiGetList.isEmpty) {
                 multiget(table, multiGetList, cf).foreach(row => {
@@ -146,16 +132,16 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
     }
   }
 
-  final class HBaseJoinRangeScan[L, R](cf: Array[Byte]*) extends HBaseJoin[L, R] {
-    def apply(cfr: CFR[L], rightSideRddWithSortedPartitions: RDD[(K, R)]): RDD[(K, (L, R))] = {
+  final class HBaseJoinRangeScan[W](cf: Array[Byte]*) extends HBaseJoin[W] {
+    def apply(cfr: Result => V, rightSideRddWithSortedPartitions: RDD[(K, W)]): RDD[(K, (V, W))] = {
       val cf = this.cf
       val broadCastConf = new SerializableWritable(self.hbaseConf)
       val tableNameAsString = self.tableNameAsString
       val keyToBytes = self.keyToBytes
-      rightSideRddWithSortedPartitions.mapPartitionsWithIndex[(K, (L, R))] { case (p, part) => {
+      rightSideRddWithSortedPartitions.mapPartitionsWithIndex[(K, (V, W))] { case (p, part) => {
         if (part.isEmpty) {
           Iterator.empty
-        } else new Iterator[(K, (L, R))] {
+        } else new Iterator[(K, (V, W))] {
           val connection = ConnectionFactory.createConnection(broadCastConf.value)
           val table = connection.getTable(TableName.valueOf(tableNameAsString))
           val scan = new Scan();
@@ -165,7 +151,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
           // TODO consistency TIMELINE enable on hbase master
           val forward = part.buffered
           var scanner: ResultScanner = null
-          var current: Option[(K, (L, R))] = None
+          var current: Option[(K, (V, W))] = None
           var leftRow: Result = null
 
           private def nextLeftRow {
@@ -207,7 +193,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
             result
           }
 
-          override def next(): (K, (L, R)) = {
+          override def next(): (K, (V, W)) = {
             if (current.isEmpty) throw new NoSuchElementException
             val result = current.get
             current = None
@@ -220,8 +206,16 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
     }
   }
 
-  final class HBaseLookupMultiGet[L, R](val batchSize: Int, val cf: Array[Byte]*) extends HBaseLookup[L, R] {
-    def apply(cfr: CFR[L], rightSideRdd: RDD[(K, (Option[L], R))]): RDD[(K, (Option[L], R))] = {
+  /**
+   * HBaseLookup is a further optimisation of HBaseJoin for highly-iterative usecases like graph algorithms
+   * where the already looked-up values can be cached and only as the algorithm 'explores' the underlying table
+   * the new values are looked up - again multiple variants are implemented below
+   */
+  abstract class HBaseLookup[W] extends Function2[Result => V, RDD[(K, (Option[V], W))], RDD[(K, (Option[V], W))]]
+
+
+  final class HBaseLookupMultiGet[W](val batchSize: Int, val cf: Array[Byte]*) extends HBaseLookup[W] {
+    def apply(cfr: Result => V, rightSideRdd: RDD[(K, (Option[V], W))]): RDD[(K, (Option[V], W))] = {
       val cf = this.cf
       val broadCastConf = new SerializableWritable(self.hbaseConf)
       val tableNameAsString = self.tableNameAsString
@@ -232,17 +226,17 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
       rightSideRdd.mapPartitions(part => {
         val connection = ConnectionFactory.createConnection(broadCastConf.value)
         val table = connection.getTable(TableName.valueOf(tableNameAsString))
-        val forward: BufferedIterator[(K, (Option[L], R))] = part.buffered
-        val emptyLeftSide = Some(null.asInstanceOf[L])
+        val forward: BufferedIterator[(K, (Option[V], W))] = part.buffered
+        val emptyLeftSide = Some(null.asInstanceOf[V])
 
-        new Iterator[(K, (Option[L], R))] {
-          var buffer: Option[Iterator[(K, (Option[L], R))]] = None
-          var bufferMap = scala.collection.mutable.Map[K, (Option[L], R)]()
+        new Iterator[(K, (Option[V], W))] {
+          var buffer: Option[Iterator[(K, (Option[V], W))]] = None
+          var bufferMap = scala.collection.mutable.Map[K, (Option[V], W)]()
           var multiGet = mutable.MutableList[Array[Byte]]()
 
           override def hasNext: Boolean = forward.hasNext || checkBuffer
 
-          override def next(): (K, (Option[L], R)) = if (checkBuffer) buffer.get.next else forward.next
+          override def next(): (K, (Option[V], W)) = if (checkBuffer) buffer.get.next else forward.next
 
           private def checkBuffer: Boolean = {
             if (buffer.isDefined) {
@@ -250,7 +244,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
                 return true
               } else {
                 buffer = None
-                bufferMap = scala.collection.mutable.Map[K, (Option[L], R)]()
+                bufferMap = scala.collection.mutable.Map[K, (Option[V], W)]()
                 multiGet = mutable.MutableList[Array[Byte]]()
               }
             }
@@ -289,4 +283,5 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K,V])(implicit vk: ClassTag[K], vt:
       }, preservesPartitioning = true)
     }
   }
+
 }

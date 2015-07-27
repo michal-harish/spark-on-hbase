@@ -3,17 +3,16 @@ package org.apache.spark.hbase
 import java.util.UUID
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileStatus, Path, FileSystem}
-import org.apache.hadoop.hbase.io.ImmutableBytesWritable
-import org.apache.hadoop.hbase.mapreduce.{LoadIncrementalHFiles, HFileOutputFormat2}
+import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.apache.hadoop.hbase._
 import org.apache.hadoop.hbase.client._
+import org.apache.hadoop.hbase.io.ImmutableBytesWritable
+import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat2, LoadIncrementalHFiles}
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.mapreduce.Job
 import org.apache.hadoop.mapreduce.lib.partition.TotalOrderPartitioner
-import org.apache.spark.hbase.keyspace.{HBaseRddHKey, HKey}
-import org.apache.spark.{SparkContext, SerializableWritable}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.{SerializableWritable, SparkContext}
 
 import scala.reflect.ClassTag
 
@@ -32,10 +31,12 @@ import scala.reflect.ClassTag
  * .bulkLoad
  * .bulkDelete
  */
-abstract class HBaseTable[K]( val hbaConf: Configuration,
+abstract class HBaseTable[K]( @transient private val sc: SparkContext,
                               val tableNameAsString: String,
                               val numberOfRegions: Int,
-                              cfDescriptors: HColumnDescriptor*) extends HBaseRDDTypes[K, Result] {
+                              cfDescriptors: HColumnDescriptor*) {
+
+  @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
 
   val tableName = TableName.valueOf(tableNameAsString)
 
@@ -47,30 +48,30 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
 
   protected def bytesToKey: Array[Byte] => K
 
-  def rdd()(implicit context: SparkContext): RDD[(K, Result)] = {
+  def rdd(): HBaseRDD[K, Result] = {
     val bytesToKeyCopy = this.bytesToKey
     val keyToBytesCopy = this.keyToBytes
-    new HBaseRDD[K, Result](context, tableName, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP) {
+    new HBaseRDD[K, Result](sc, tableName, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP) {
       override def bytesToKey = bytesToKeyCopy
       override def keyToBytes = keyToBytesCopy
       override def resultToValue = (result: Result) => result
     }
   }
 
-  def rdd(cf: Array[Byte], maxStamp: Long)(implicit context: SparkContext): RDD[(K, Result)] = {
+  def rdd(cf: Array[Byte], maxStamp: Long): HBaseRDD[K, Result] = {
     val bytesToKeyCopy = this.bytesToKey
     val keyToBytesCopy = this.keyToBytes
-    new HBaseRDD[K, Result](context, tableName, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf)) {
+    new HBaseRDD[K, Result](sc, tableName, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf)) {
       override def bytesToKey = bytesToKeyCopy
       override def keyToBytes = keyToBytesCopy
       override def resultToValue = (result: Result) => result
     }
   }
 
-  def rdd(columns: String*)(implicit context: SparkContext): RDD[(K, Result)] = {
+  def rdd(columns: String*): HBaseRDD[K, Result] = {
     val bytesToKeyCopy = this.bytesToKey
     val keyToBytesCopy = this.keyToBytes
-    new HBaseRDD[K, Result](context, tableName,  HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*) {
+    new HBaseRDD[K, Result](sc, tableName,  HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*) {
       override def bytesToKey = bytesToKeyCopy
       override def keyToBytes = keyToBytesCopy
       override def resultToValue = (result: Result) => result
@@ -78,7 +79,7 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
   }
 
   /**
-   * bulk load operations for put and delete wihich generate directly HFiles
+   * bulk load operations for put and delete which generate directly HFiles
    * - requires the job/shell to be run us hbase user
    * - completeAsync - tells the job to complete the incremental load in the background or do it synchronously
    */
@@ -98,7 +99,7 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
   }
 
   def dropIfExists {
-    val connection = ConnectionFactory.createConnection(hbaConf)
+    val connection = ConnectionFactory.createConnection(hbaseConf)
     val admin = connection.getAdmin
     try {
       if (admin.tableExists(tableName)) {
@@ -114,7 +115,7 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
   }
 
   def dropColumnIfExists(family: Array[Byte]): Boolean = {
-    val connection = ConnectionFactory.createConnection(hbaConf)
+    val connection = ConnectionFactory.createConnection(hbaseConf)
     val admin = connection.getAdmin
     try {
       val columns = admin.getTableDescriptor(tableName).getColumnFamilies
@@ -133,7 +134,7 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
   }
 
   def createIfNotExists: Boolean = {
-    val connection = ConnectionFactory.createConnection(hbaConf)
+    val connection = ConnectionFactory.createConnection(hbaseConf)
     val admin = connection.getAdmin
     try {
       if (!admin.tableExists(tableName)) {
@@ -168,10 +169,9 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
 
 
   def update(family: Array[Byte], updateRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])])(implicit tag: ClassTag[K]): Long = {
-    val context = updateRdd.context
-    val broadCastConf = new SerializableWritable(hbaConf)
+    val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
-    val updateCount = context.accumulator(0L, "HGraph Net Update Counter")
+    val updateCount = sc.accumulator(0L, "HGraph Net Update Counter")
     val keyToBytes = this.keyToBytes
     println(s"HBATable ${tableNameAsString} UPDATE RDD PARTITIONED BY ${updateRdd.partitioner}")
     updateRdd.partitionBy(partitioner).foreachPartition(part => {
@@ -203,7 +203,7 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
   }
 
   def increment(family: Array[Byte], qualifier: Array[Byte], incrementRdd: RDD[(K, Long)])(implicit tag: ClassTag[K]) {
-    val broadCastConf = new SerializableWritable(hbaConf)
+    val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
     val keyToBytes = this.keyToBytes
     incrementRdd.partitionBy(partitioner).foreachPartition(part => {
@@ -227,10 +227,9 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
   }
 
   def delete(family: Array[Byte], deleteRdd: RDD[(K, Seq[Array[Byte]])])(implicit tag: ClassTag[K]): Long = {
-    val context = deleteRdd.context
-    val broadCastConf = new SerializableWritable(hbaConf)
+    val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
-    val toDeleteCount = context.accumulator(0L, "HGraph Net Delete Counter1")
+    val toDeleteCount = sc.accumulator(0L, "HGraph Net Delete Counter1")
     val keyToBytes = this.keyToBytes
     deleteRdd.partitionBy(partitioner).foreachPartition(part => {
       val connection = ConnectionFactory.createConnection(broadCastConf.value)
@@ -260,9 +259,8 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
     toDeleteCount.value
   }
 
-  def load(family: Array[Byte], bulkRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])], completeAsync: Boolean): Long = {
-    val context = bulkRdd.context
-    val acc = context.accumulator(0L, s"HBATable ${tableName} load count")
+  def bulkLoad(family: Array[Byte], bulkRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])], completeAsync: Boolean): Long = {
+    val acc = sc.accumulator(0L, s"HBATable ${tableName} load count")
     val keyToBytes = this.keyToBytes
     implicit val keyValueOrdering = KeyValueOrdering
 
@@ -284,8 +282,7 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
   }
 
   def bulkDelete(family: Array[Byte], deleteRdd: RDD[(K, Seq[Array[Byte]])], completeAsync: Boolean): Long = {
-    val context = deleteRdd.context
-    val acc = context.accumulator(0L, s"HBATable ${tableName} delete count")
+    val acc = sc.accumulator(0L, s"HBATable ${tableName} delete count")
     val cfs = families.map(_.getName)
     val keyToBytes = this.keyToBytes
     implicit val keyValueOrdering = KeyValueOrdering
@@ -312,8 +309,7 @@ abstract class HBaseTable[K]( val hbaConf: Configuration,
   }
 
   protected[spark] def bulk(hFileRdd: RDD[(ImmutableBytesWritable, KeyValue)], completeAsync: Boolean) = {
-    val context = hFileRdd.context
-    val conf = hbaConf
+    val conf = hbaseConf
     val fs = FileSystem.get(conf)
     val hFile = new Path("/tmp", s"${tableNameAsString}_${UUID.randomUUID}")
     fs.makeQualified(hFile)

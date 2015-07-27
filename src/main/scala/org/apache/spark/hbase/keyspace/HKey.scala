@@ -4,7 +4,7 @@ import org.apache.spark.hbase.ByteUtils
 import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
 
 class HKey(val keySpace: Short, val bytes: Array[Byte], val hash: Int)(implicit reg: HKSREG)
-extends java.io.Serializable with Ordered[HKey] {
+extends Serializable with Ordered[HKey] {
   override def compareTo(that: HKey): Int = {
     ByteUtils.compare(this.bytes, 0, this.bytes.length, that.bytes, 0, that.bytes.length)
   }

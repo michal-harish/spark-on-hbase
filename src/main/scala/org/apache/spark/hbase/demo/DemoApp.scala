@@ -7,53 +7,12 @@ import org.apache.spark.hbase._
 import org.apache.spark.hbase.keyspace._
 import org.apache.spark.rdd.RDD
 
-object DemoApp extends App {
-  /** Execution sequence **/
-  try {
-    if (args.length == 0) {
-      throw new IllegalArgumentException
-    }
-    val context = new SparkContext() // hoping to get all configuration passed from scripts/spark-submit
-    val demo = new DemoApp(context)
-    try {
-      val a = args.iterator
-      while (a.hasNext) {
-        a.next match {
-          case arg: String if (!arg.startsWith("-")) => {
-            try {
-              val methodArgs = arg.split(" ")
-              if (methodArgs.length == 1) {
-                val m = demo.getClass.getMethod(methodArgs(0))
-                time(m.invoke(demo))
-              } else {
-                val m = demo.getClass.getMethod(methodArgs(0), classOf[String])
-                time(m.invoke(demo, methodArgs(1)))
-              }
-            } catch {
-              case e: NoSuchMethodException => println(s"method `${args(0)}` not defined in the DXPJobRunner")
-            }
-          }
-        }
-      }
-    } finally {
-      context.stop
-    }
-  } catch {
-    case e: IllegalArgumentException => {
-      println("Usage:")
-      println("./spark-submit [-p] [-l|-xl|-xxl]  \"<command [argument]>\" ")
-    }
-  }
-
-  def time[A](a: => A): A = {
-    val l = System.currentTimeMillis
-    val r = a
-    println((System.currentTimeMillis - l).toDouble / 1000)
-    r
-  }
-
-}
-
+/**
+ * class DemoApp is a starting point for spark-shell and spark-submit. When launched as a spark-shell
+ * the initialisation demo-init.scala script passed instantiates DemoApp and imports all it's members to the top-level scope.
+ *
+ * When launched as a spark-submit, the companion object DemoApp is started
+ */
 class DemoApp(sc: SparkContext) {
 
   implicit val context = sc
@@ -63,7 +22,7 @@ class DemoApp(sc: SparkContext) {
     new HKeySpaceUUID("u").keyValue
   )
 
-  val graph = new HGraph("demo-graph", 256)
+  val graph = new HGraph(context, "demo-graph", 256)
 
   implicit val partitioner = graph.partitioner
 
@@ -86,11 +45,10 @@ class DemoApp(sc: SparkContext) {
         try {
           val numRegions = regionLocator.getStartKeys.length
           val desc = admin.getTableDescriptor(tableName)
-          new HBaseTable[String](hbaseConfig, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*) {
+          new HBaseTable[String](context, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*) {
             override protected def keyToBytes = (rowKey: String) => rowKey.getBytes
             override protected def bytesToKey = (key: Array[Byte]) => new String(key)
           }
-          new HBaseTable[String](hbaseConfig, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*) { override protected def keyToBytes = (rowKey: String) => rowKey.getBytes; override protected def bytesToKey = (key: Array[Byte]) => new String(key)}
         } finally {
           regionLocator.close
         }
@@ -101,8 +59,6 @@ class DemoApp(sc: SparkContext) {
       connection.close
     }
   }
-
-
 
   /**
    * From an adjacency lists represented as coma-separated ids to a redundant NETWORK
@@ -189,5 +145,55 @@ class DemoApp(sc: SparkContext) {
   //    })
   //    HGraphII.loadNet(migrateRdd, closeContextOnExit = true, completeAsync = false)
   //  }
+
+}
+
+/**
+ * object DemoApp is an execution start point for spark-submit
+ */
+object DemoApp extends App {
+  /** Execution sequence **/
+  try {
+    if (args.length == 0) {
+      throw new IllegalArgumentException
+    }
+    val context = new SparkContext() // hoping to get all configuration passed from scripts/spark-submit
+    val demo = new DemoApp(context)
+    try {
+      val a = args.iterator
+      while (a.hasNext) {
+        a.next match {
+          case arg: String if (!arg.startsWith("-")) => {
+            try {
+              val methodArgs = arg.split(" ")
+              if (methodArgs.length == 1) {
+                val m = demo.getClass.getMethod(methodArgs(0))
+                time(m.invoke(demo))
+              } else {
+                val m = demo.getClass.getMethod(methodArgs(0), classOf[String])
+                time(m.invoke(demo, methodArgs(1)))
+              }
+            } catch {
+              case e: NoSuchMethodException => println(s"method `${args(0)}` not defined in the DXPJobRunner")
+            }
+          }
+        }
+      }
+    } finally {
+      context.stop
+    }
+  } catch {
+    case e: IllegalArgumentException => {
+      println("Usage:")
+      println("./spark-submit [-p] [-l|-xl|-xxl]  \"<command [argument]>\" ")
+    }
+  }
+
+  def time[A](a: => A): A = {
+    val l = System.currentTimeMillis
+    val r = a
+    println((System.currentTimeMillis - l).toDouble / 1000)
+    r
+  }
 
 }
