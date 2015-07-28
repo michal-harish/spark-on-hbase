@@ -40,11 +40,11 @@ val cf1 = Bytes.toBytes("CF1")
 val qual1 = Bytes.toBytes("col1int")
 val qual2 = Bytes.toBytes("col2double")
 
-val rdd2: RDD[String, (Int, Double)] = rdd1.map { case (rowKey, rowCellsResult) => {
+val rdd2: RDD[String, (Int, Double)] = rdd1.map { case (rowKey, cells) => {
     val keyAsString = Bytes.toString(rowKey)
-    val cell1 = row.getColumnLatestCell(cf1, qual1)
+    val cell1 = cells.getColumnLatestCell(cf1, qual1)
+    val cell2 = cells.getColumnLatestCell(cf1, qual2)
     val value1 = Bytes.toInt(cell1.getValueArray, cell1.getValueOffset)
-    val cell2 = row.getColumnLatestCell(cf1, qual2)
     val value2 = Bytes.toDouble(cell2.getValueArray, cell2.getValueOffset)
     (keyAsString, (value1, value2))
 }}
@@ -55,13 +55,14 @@ val rdd2: RDD[String, (Int, Double)] = rdd1.map { case (rowKey, rowCellsResult) 
 Extending HBaseRDD class to provide richer semantics. The example is implemented as a demo application.
 
 Run the following script which will package the demo application in org.apache.spark.hbase.examples.demo.simple
+
 ```./scripts/build demo-simple```
 
 You can then run the demo appliation as a shell:
 
-`./scripts/demo-simple-shell`
+```./scripts/demo-simple-shell```
 
-# quick start - 3 - specialise `keyspace` implementation
+# quick start - 3 - specialise keyspace implementation
 
 This example makes use of the org.apache.spark.hbase.keyspace which provides specialised __`HKey`__ implementation that
 addresses several scalability issues and general integration between spark and hbase. It also provides specialised
@@ -83,4 +84,4 @@ You can then run the demo appliation as a shell:
 
 - Unify key value mappers under a single interface
 - Add implicit Ordering[K] for all HBaseRDD representations, as HBase is ordered by definition
-- Refactor for enabling forks and make the graph demo an example of a fork
+- Refactor for enabling forks and finish off the graph demo which currently doesn't really work
