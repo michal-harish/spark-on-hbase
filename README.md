@@ -24,7 +24,7 @@ NOTE: that the scripts predefined here for spark-shell and spark-submit define t
 
 If you don't have your spark assembly jar ready on the driver or available in hdfs for executors, you'll first need to build it and put it on the driver and into hdfs.
 
-# quick start - 1 basic use case
+# example 1 basic use case
 
 Mapping an existing table to an instance of HBaseRdd[(Array[Byte], hbase.client.Result)]
 
@@ -49,7 +49,7 @@ val rdd2: RDD[String, (Int, Double)] = rdd1.map { case (rowKey, cells) => {
 }}
 ```
 
-# quick start - 2 standard use case
+# example 2 standard use case
 
 Extending HBaseRDD class to provide richer semantics. The example is implemented as a demo application.
 
@@ -61,10 +61,10 @@ You can then run the demo appliation as a shell:
 
 ``` ./scripts/demo-simple-shell ```
 
-# quick start - 3 - large scale operations
+# example 3 - large scale operations
   TODO demo and section about joining and transforming large tables and using bulk operations
 
-# quick start - 4 - experimental stuff
+# example 4 - experimental stuff
 
 This example makes use of the org.apache.spark.hbase.keyspace which provides specialised __`HKey`__ implementation that
 addresses several scalability issues and general integration between spark and hbase. It also provides specialised
