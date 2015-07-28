@@ -3,7 +3,7 @@ This is a generic extension of spark for efficient scanning, joining and updatin
 Its main concepts are __`HBaseRDD`__ and __`HBaseTable`__. `HBaseRDD` is used for scanning and optimised single-stage joins while `HBaseTable` is for mutating underlying hbase table using RDDs as input.
 
 It can be used in 3 major ways:
-- __Basic__: In the most basic case it can be used to simply map existing hbase tables to HBaseRDD which will result a simple pair RDD[(Array[Byte], hbase.client.Result)]. These can be filtered, transformed,.. as any other RDD and the result can be given to HBaseTable as a mutation to execute.
+- __Basic__: In the most basic case it can be used to simply map existing hbase tables to HBaseRDD which will result a simple pair RDD[(Array[Byte], hbase.client.Result)]. These can be filtered, transformed,.. as any other RDD and the result can be for example given to HBaseTable as a mutation to execute on the same underlying table.
 - __Standard__: In the more typical case, by extending HBaseRDDBase and HBaseTable to provide mapping of raw key bytes and hbase result to some more meaningful types. You can learn about this method by studying the demo-simple application
 - __Specialised__: Using the keyspace extension to the basic HBaseRDD and HBaseTable. This extension cannot be used on existing tables because it uses predefined key structure which aims to get the most from both spark and hbase perspective. You can learn more about this method by studing the demo-graph application.
 
