@@ -1,5 +1,6 @@
 package org.apache.spark.hbase
 
+import java.io.Serializable
 import java.util.UUID
 
 import org.apache.hadoop.conf.Configuration
@@ -31,49 +32,45 @@ import scala.reflect.ClassTag
  * .bulkLoad
  * .bulkDelete
  */
-abstract class HBaseTable[K]( @transient private val sc: SparkContext, val tableNameAsString: String) {
 
-  @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
+abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString: String) {
 
-  val (numberOfRegions, families) = Utils.getTableMetaData(hbaseConf, tableNameAsString)
+  val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
 
   val tableName = TableName.valueOf(tableNameAsString)
 
-  implicit val partitioner = new RegionPartitioner(numberOfRegions)
+  val (numberOfRegions, families) = Utils.getTableMetaData(hbaseConf, tableNameAsString)
+
+  val partitioner = new RegionPartitioner(numberOfRegions)
 
   protected def keyToBytes: K => Array[Byte]
 
   protected def bytesToKey: Array[Byte] => K
 
-  def rdd(): HBaseRDD[K, Result] = {
-    val bytesToKeyCopy = this.bytesToKey
-    val keyToBytesCopy = this.keyToBytes
-    new HBaseRDD[K, Result](sc, tableName, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP) {
-      override def bytesToKey = bytesToKeyCopy
-      override def keyToBytes = keyToBytesCopy
-      override def resultToValue = (result: Result) => result
+  def rdd = {
+    rdd[Result]((result: Result) => result, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP)
+  }
+
+  def rdd(columns: String*) = {
+    rdd[Result]((result: Result) => result, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
+  }
+
+  def rdd(minStamp: Long, maxStamp: Long, columns: String*) = {
+    rdd[Result]((result: Result) => result, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
+  }
+
+  def rdd[V](valueMapper: (Result) => V, minStamp: Long, maxStamp: Long, columns: String*) = {
+    val bytesToKeyCopy1 = HBaseTable.this.bytesToKey
+    val keyToBytesCopy1 = HBaseTable.this.keyToBytes
+    new HBaseRDD[K, V](sc, tableNameAsString, minStamp, maxStamp, columns: _*) {
+      override def bytesToKey = bytesToKeyCopy1
+
+      override def keyToBytes = keyToBytesCopy1
+
+      override def resultToValue = valueMapper
     }
   }
 
-  def rdd(cf: Array[Byte], maxStamp: Long): HBaseRDD[K, Result] = {
-    val bytesToKeyCopy = this.bytesToKey
-    val keyToBytesCopy = this.keyToBytes
-    new HBaseRDD[K, Result](sc, tableName, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf)) {
-      override def bytesToKey = bytesToKeyCopy
-      override def keyToBytes = keyToBytesCopy
-      override def resultToValue = (result: Result) => result
-    }
-  }
-
-  def rdd(columns: String*): HBaseRDD[K, Result] = {
-    val bytesToKeyCopy = this.bytesToKey
-    val keyToBytesCopy = this.keyToBytes
-    new HBaseRDD[K, Result](sc, tableName,  HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*) {
-      override def bytesToKey = bytesToKeyCopy
-      override def keyToBytes = keyToBytesCopy
-      override def resultToValue = (result: Result) => result
-    }
-  }
 
   /**
    * bulk load operations for put and delete which generate directly HFiles
@@ -301,6 +298,5 @@ abstract class HBaseTable[K]( @transient private val sc: SparkContext, val table
     if (f.isDirectory) fs.listStatus(f.getPath).foreach(f1 => verifyFileStatus(fs, f1, verifyOwner))
     if (f.getOwner != verifyOwner) throw new IllegalStateException(s"This job must be run as `${verifyOwner}` user")
   }
-
-
+  
 }

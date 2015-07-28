@@ -7,7 +7,7 @@ package object HKeySpaceRegistry {
   type HKSREG = Map[Short, HKeySpace]
 }
 
-object HKeySpace {
+object HKeySpace extends Serializable {
   def apply(id: Array[Byte], offset: Int, length: Int): Short = {
     (((id(offset + 4) & 0xff) << 8) + (id(offset + 5) & 0xff)).toShort
   }

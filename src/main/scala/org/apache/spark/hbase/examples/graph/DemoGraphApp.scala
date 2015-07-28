@@ -36,7 +36,7 @@ class DemoGraphApp(sc: SparkContext) {
   }
 
   def create = {
-    Utils.createIfNotExists(sc, graph.tableNameAsString, numRegions = 256, graph.schema:_*)
+    Utils.updateSchema(sc, graph.tableNameAsString, numRegions = 256, graph.schema:_*)
   }
 
   /**

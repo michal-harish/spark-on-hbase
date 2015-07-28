@@ -96,7 +96,8 @@ object Utils {
     family
   }
 
-  def createIfNotExists(sc: SparkContext, tableNameAsString: String, numRegions: Int, families: HColumnDescriptor*): Boolean = {
+  def updateSchema(sc: SparkContext, tableNameAsString: String, numRegions: Int, families: HColumnDescriptor*): Boolean = {
+    println(s"CHECKING TABLE `${tableNameAsString}` SCHEMA FOR with ${families.size} column families: " + families.map(_.getNameAsString).mkString(","))
     val hbaseConf = initConfig(sc, HBaseConfiguration.create)
     val connection = ConnectionFactory.createConnection(hbaseConf)
     val admin = connection.getAdmin
@@ -111,18 +112,20 @@ object Utils {
         admin.createTable(descriptor, partitioner.startKey, partitioner.endKey, numRegions)
         return true
       } else {
+        println("TABLE ALREADY EXISITS " + tableNameAsString)
         //alter columns
         val existingColumns = admin.getTableDescriptor(tableName).getColumnFamilies
         families.map(f => {
-          if (!families.exists(_.getNameAsString == f.getNameAsString)) {
+          if (!existingColumns.exists(_.getNameAsString == f.getNameAsString)) {
             println(s"ADDING COLUMN ${f.getNameAsString} TO TABLE ${tableNameAsString}")
             admin.addColumn(tableName, f)
             true
-          } else if (f.compareTo(families.filter(_.getNameAsString == f.getNameAsString).head) != 0) {
+          } else if (f.compareTo(existingColumns.filter(_.getNameAsString == f.getNameAsString).head) != 0) {
             println(s"MODIFYING COLUMN ${f.getNameAsString} TO TABLE ${tableNameAsString}")
             admin.modifyColumn(tableName, f)
             true
           } else {
+            println(s"COLUMN ${f.getNameAsString} IN TABLE ${tableNameAsString} UNALTERED")
             false
           }
         }).exists(_ == true)

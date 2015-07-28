@@ -14,17 +14,16 @@ import scala.reflect.ClassTag
  * Created by mharis on 26/07/15.
  */
 
-abstract class HBaseRDD[K, V](  @transient private val sc: SparkContext
-                              , @transient private val tableName: TableName
+abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
+                              , val tableNameAsString: String
                               , val minStamp: Long
                               , val maxStamp: Long
                               , val columns: String*) extends RDD[(K, V)](sc, Nil) {
 
+  @transient private val tableName = TableName.valueOf(tableNameAsString)
   @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
   protected val configuration = new SerializableWritable(hbaseConf)
   protected val regionSplits: Array[(Array[Byte], Array[Byte])] = Utils.getRegionSplits(hbaseConf, tableName)
-
-  val tableNameAsString = tableName.toString
 
   val cf: Seq[Array[Byte]] = columns.map(_ match {
     case cf: String if (!cf.contains(':')) => Bytes.toBytes(cf)
@@ -32,7 +31,6 @@ abstract class HBaseRDD[K, V](  @transient private val sc: SparkContext
       case Array(cf, qualifier) => Bytes.toBytes(cf)
     }
   })
-
 
   def bytesToKey: Array[Byte] => K
 
@@ -78,6 +76,7 @@ abstract class HBaseRDD[K, V](  @transient private val sc: SparkContext
     val scanner: ResultScanner = table.getScanner(scan)
     var current: Option[(K, V)] = None
     val bytesToKey = this.bytesToKey
+    val resultToValue = this.resultToValue
 
     new Iterator[(K, V)] {
       override def hasNext: Boolean = current match {
@@ -115,7 +114,16 @@ abstract class HBaseRDD[K, V](  @transient private val sc: SparkContext
 
 object HBaseRDD {
   implicit def hBaseRddToPairRDDFunctions[K, V](rdd: HBaseRDD[K, V])
-       (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null): HBaseRDDFunctions[K, V] = {
+    (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null): HBaseRDDFunctions[K, V] = {
     new HBaseRDDFunctions[K, V](rdd)
+  }
+
+  def create(sc: SparkContext, tableNameAsString: String, minStamp: Long, maxStamp: Long, columns: String*)
+  = new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, minStamp, maxStamp, columns:_*) {
+    override def bytesToKey = (bytes: Array[Byte]) => bytes
+
+    override def keyToBytes = (key: Array[Byte]) => key
+
+    override def resultToValue = (result: Result) => result
   }
 }

@@ -226,7 +226,7 @@ class HGraph(sc: SparkContext, tableName: String)(implicit reg: HKSREG) extends 
       while (scanner.advance) numEdges += 1L
       numEdges
     }
-    rdd(cfNet, beforeTimestamp).mapValues(CFRNumEdges)
+    rdd(HConstants.OLDEST_TIMESTAMP, beforeTimestamp, "N").mapValues(CFRNumEdges)
   }
 
   /**
@@ -286,7 +286,7 @@ class HGraph(sc: SparkContext, tableName: String)(implicit reg: HKSREG) extends 
       }
       edgeSeqBuilder.result
     }
-    (if (allSpaces) rdd(cfNet, beforeTimestamp) else rdd(sIdSpace, cfNet, beforeTimestamp))
+    (if (allSpaces) rdd(HConstants.OLDEST_TIMESTAMP, beforeTimestamp, "N") else rdd(sIdSpace, cfNet, beforeTimestamp))
       .mapValues(CFREdge1S)
   }
 

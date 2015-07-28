@@ -21,11 +21,11 @@ class HBaseTableHKey(sc: SparkContext, tableNameAsString: String)(implicit reg: 
   protected def bytesToKey = (bytes: Array[Byte]) => HKey(bytes)
 
   def rdd(keyIdSpace: Short, columns: String*): RDD[(HKey, Result)] = {
-    new HBaseRDDHKey(sc, tableName, keyIdSpace, columns: _*)
+    new HBaseRDDHKey(sc, tableNameAsString, keyIdSpace, columns: _*)
   }
 
   def rdd(keyIdSpace: Short, cf: Array[Byte], maxStamp: Long): RDD[(HKey, Result)] = {
-    new HBaseRDDHKey(sc, tableName, keyIdSpace, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf))
+    new HBaseRDDHKey(sc, tableNameAsString, keyIdSpace, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf))
   }
 
 

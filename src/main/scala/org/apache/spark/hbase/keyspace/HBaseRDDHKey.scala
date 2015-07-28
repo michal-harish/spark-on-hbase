@@ -28,21 +28,21 @@ import scala.collection.JavaConverters._
  * column, e.g. 'F:propensity'
  */
 class HBaseRDDHKey(@transient private val sc: SparkContext
-               , @transient private val tableName: TableName
+               , tableNameAsString: String
                , idSpace: Short
                , minStamp: Long
                , maxStamp: Long
                , columns: String*
-                )(implicit reg: HKSREG) extends HBaseRDD[HKey, Result](sc, tableName, minStamp, maxStamp) {
+                )(implicit reg: HKSREG) extends HBaseRDD[HKey, Result](sc, tableNameAsString, minStamp, maxStamp) {
 
-  def this(sc: SparkContext, tableName: TableName, columns: String*)(implicit reg: HKSREG)
-  = this(sc, tableName, -1.toShort, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
+  def this(sc: SparkContext, tableNameAsString: String, columns: String*)(implicit reg: HKSREG)
+  = this(sc, tableNameAsString, -1.toShort, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
 
-  def this(sc: SparkContext, tableName: TableName, minStamp: Long, maxStamp: Long, columns: String*)(implicit reg: HKSREG)
-  = this(sc, tableName, -1.toShort, minStamp, maxStamp, columns: _*)
+  def this(sc: SparkContext, tableNameAsString: String, minStamp: Long, maxStamp: Long, columns: String*)(implicit reg: HKSREG)
+  = this(sc, tableNameAsString, -1.toShort, minStamp, maxStamp, columns: _*)
 
-  def this(sc: SparkContext, tableName: TableName, idSpace: Short, columns: String*)(implicit reg: HKSREG)
-  = this(sc, tableName, idSpace, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
+  def this(sc: SparkContext, tableNameAsString: String, idSpace: Short, columns: String*)(implicit reg: HKSREG)
+  = this(sc, tableNameAsString, idSpace, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
 
   override def bytesToKey = (rowKey: Array[Byte]) => HKey(rowKey)
 
