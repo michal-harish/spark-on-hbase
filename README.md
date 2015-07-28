@@ -24,7 +24,7 @@ NOTE: that the scripts predefined here for spark-shell and spark-submit define t
 
 If you don't have your spark assembly jar ready on the driver or available in hdfs for executors, you'll first need to build it and put it on the driver and into hdfs.
 
-# example 1 basic use case
+# example 1 - basic use case
 
 Mapping an existing table to an instance of HBaseRdd[(Array[Byte], hbase.client.Result)]
 
@@ -49,7 +49,7 @@ val rdd2: RDD[String, (Int, Double)] = rdd1.map { case (rowKey, cells) => {
 }}
 ```
 
-# example 2 standard use case
+# example 2 - standard use case
 
 Extending HBaseRDD class to provide richer semantics. The example is implemented as a demo application.
 
@@ -73,7 +73,7 @@ __`HBaseRDDHKey`__ and __`HBaseRDDTableHKey`__ which all share the concept of HK
  
  ``` [4-byte-hash] [2-byte-keyspace-symbol] [n-byte-key-value] ``` 
  
- it also possible to do the hbase server-side fuzzy filtering for a specific 2-byte symbol by ignoring the first 4 bytes and matching 5th and 6th. Each implementation of HKeySpace must provide serde methods for generating hash and value into pre-allocated byte array by the HKeySpace abstraction. More information is in the comments of the demo application and the package classes.
+..it is also possible to do the hbase server-side fuzzy filtering for a specific 2-byte symbol by ignoring the first 4 bytes and matching 5th and 6th. Each implementation of HKeySpace must provide serde methods for generating hash and value into pre-allocated byte array by the HKeySpace abstraction. More information is in the comments of the demo application and the package classes.
 
 Run the following script which will package the demo application in org.apache.spark.hbase.examples.demo.graph
 ```./scripts/build demo-graph```
@@ -84,9 +84,8 @@ You can then run the demo appliation as a shell:
 
 # TODOs
 
-- Mechanism for choosing HBaseJoin implementation must be done per operation, not simply configuration variable
-  because the type of join depends on the relative volume of the RDDs not location or resource. 
-- Write more comprehensive tutorial, generating larger table, writing a distributed algorithm over one column family
-  and bulk-loading the result mutation into the second column family.
+- Right now the HBaseRDDHkey is trying to serialise HBaseTableHKey which is an outerclass for the bytesToKey but unsure what is different from the HBaseTableSimple in the demo which doesn't have serial.issue with the same closures.
+- Mechanism for choosing HBaseJoin implementation must be done per operation, not simply configuration variable because the type of join depends on the relative volume of the RDDs not location or resource. 
+- Write more comprehensive tutorial, generating larger table, writing a distributed algorithm over one column family and bulk-loading the result mutation into the second column family.
 - Add implicit Ordering[K] for all HBaseRDD representations since HBase is ordered by definition
 - Refactor for enabling forks and finish off the graph demo which currently doesn't really work
