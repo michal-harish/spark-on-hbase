@@ -51,7 +51,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
   abstract class HBaseJoin[W] extends Function2[Result => V, RDD[(K, W)], RDD[(K, (V, W))]]
 
   final class HBaseJoinMultiGet[W](val maxGetSize: Int, val cf: Array[Byte]*) extends HBaseJoin[W] {
-    def apply(cfr: Result => V, rightSideRdd: RDD[(K, W)]): RDD[(K, (V, W))] = {
+    def apply(resultMapper: Result => V, rightSideRdd: RDD[(K, W)]): RDD[(K, (V, W))] = {
       val cf = this.cf
       val broadCastConf = new SerializableWritable(self.hbaseConf)
       val tableNameAsString = self.tableNameAsString
@@ -116,7 +116,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
                 multiget(table, multiGetList, cf).foreach(row => {
                   if (!row.isEmpty) {
                     val key = bytesToKey(row.getRow)
-                    bufferMap(key) = (cfr(row), bufferMap(key)._2)
+                    bufferMap(key) = (resultMapper(row), bufferMap(key)._2)
                   }
                 })
                 val resultBufferMap = bufferMap.filter(_._2._1 != null)
@@ -133,7 +133,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
   }
 
   final class HBaseJoinRangeScan[W](cf: Array[Byte]*) extends HBaseJoin[W] {
-    def apply(cfr: Result => V, rightSideRddWithSortedPartitions: RDD[(K, W)]): RDD[(K, (V, W))] = {
+    def apply(resultMapper: Result => V, rightSideRddWithSortedPartitions: RDD[(K, W)]): RDD[(K, (V, W))] = {
       val cf = this.cf
       val broadCastConf = new SerializableWritable(self.hbaseConf)
       val tableNameAsString = self.tableNameAsString
@@ -175,7 +175,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
                   val rightRow = forward.head
                   Bytes.compareTo(leftRow.getRow, keyToBytes(rightRow._1)) match {
                     case cmp: Int if (cmp == 0) => {
-                      current = Some((rightRow._1, (cfr(leftRow), rightRow._2)))
+                      current = Some((rightRow._1, (resultMapper(leftRow), rightRow._2)))
                       forward.next
                     }
                     case cmp: Int if (cmp < 0) => nextLeftRow
@@ -215,7 +215,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
 
 
   final class HBaseLookupMultiGet[W](val batchSize: Int, val cf: Array[Byte]*) extends HBaseLookup[W] {
-    def apply(cfr: Result => V, rightSideRdd: RDD[(K, (Option[V], W))]): RDD[(K, (Option[V], W))] = {
+    def apply(resultMapper: Result => V, rightSideRdd: RDD[(K, (Option[V], W))]): RDD[(K, (Option[V], W))] = {
       val cf = this.cf
       val broadCastConf = new SerializableWritable(self.hbaseConf)
       val tableNameAsString = self.tableNameAsString
@@ -257,7 +257,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
               val multiGetList = new util.ArrayList[Get]()
               multiget(table, multiGet, cf).foreach(row => if (!row.isEmpty) {
                 val key = bytesToKey(row.getRow)
-                bufferMap(key) = (Some(cfr(row)), bufferMap(key)._2)
+                bufferMap(key) = (Some(resultMapper(row)), bufferMap(key)._2)
               })
 
               val i = bufferMap.iterator

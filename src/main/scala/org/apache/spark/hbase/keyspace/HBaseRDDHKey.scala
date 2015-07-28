@@ -3,7 +3,8 @@ package org.apache.spark.hbase.keyspace
 import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.filter._
 import org.apache.hadoop.hbase.util.Pair
-import org.apache.hadoop.hbase.{HConstants, TableName}
+import org.apache.hadoop.hbase.TableName
+import org.apache.hadoop.hbase.HConstants._
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.HBaseRDD
 import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
@@ -36,13 +37,13 @@ class HBaseRDDHKey(@transient private val sc: SparkContext
                 )(implicit reg: HKSREG) extends HBaseRDD[HKey, Result](sc, tableNameAsString, minStamp, maxStamp) {
 
   def this(sc: SparkContext, tableNameAsString: String, columns: String*)(implicit reg: HKSREG)
-  = this(sc, tableNameAsString, -1.toShort, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
+  = this(sc, tableNameAsString, -1.toShort, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
 
   def this(sc: SparkContext, tableNameAsString: String, minStamp: Long, maxStamp: Long, columns: String*)(implicit reg: HKSREG)
   = this(sc, tableNameAsString, -1.toShort, minStamp, maxStamp, columns: _*)
 
   def this(sc: SparkContext, tableNameAsString: String, idSpace: Short, columns: String*)(implicit reg: HKSREG)
-  = this(sc, tableNameAsString, idSpace, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
+  = this(sc, tableNameAsString, idSpace, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
 
   override def bytesToKey = (rowKey: Array[Byte]) => HKey(rowKey)
 

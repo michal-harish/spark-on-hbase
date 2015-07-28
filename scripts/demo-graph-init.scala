@@ -10,7 +10,7 @@ import org.apache.spark.hbase.keyspace._
 import org.apache.spark.hbase.examples.graph._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.storage.StorageLevel._
-
+import org.apache.hadoop.hbase.HConstants._
 
 /**
  * Initialise DEMO within the current spark shell context and import all public members into the shell's global scope

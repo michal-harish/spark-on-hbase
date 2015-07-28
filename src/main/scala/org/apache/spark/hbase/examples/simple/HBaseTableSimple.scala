@@ -30,7 +30,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnD
   override protected def bytesToKey = (bytes: Array[Byte]) => new String(bytes)
 
   def rddNumCells: HBaseRDD[String, Short] = {
-    val cfr = (row: Result) => {
+    val resultMapper = (row: Result) => {
       var numCells: Int = 0
       val scanner = row.cellScanner
       while (scanner.advance) {
@@ -38,13 +38,13 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnD
       }
       numCells.toShort
     }
-    rdd[Short](cfr, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP)
+    rdd[Short](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP)
   }
 
 
   def rddTags: HBaseRDD[String, List[String]] = {
     val cfTags = Bytes.toBytes("T")
-    val cfr = (row: Result) => {
+    val resultMapper = (row: Result) => {
       val featureMapBuilder = List.newBuilder[String]
       val scanner = row.cellScanner
       while (scanner.advance) {
@@ -56,12 +56,12 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnD
       }
       featureMapBuilder.result
     }
-    rdd[List[String]](cfr, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "T")
+    rdd[List[String]](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "T")
   }
 
   def rddFeatures = {
     val cfFeatures = Bytes.toBytes("F")
-    val cfr = (row: Result) => {
+    val resultMapper = (row: Result) => {
       val featureMapBuilder = Map.newBuilder[String, Double]
       val scanner = row.cellScanner
       while (scanner.advance) {
@@ -74,17 +74,17 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnD
       }
       featureMapBuilder.result
     }
-    rdd[Map[String, Double]](cfr, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "F")
+    rdd[Map[String, Double]](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "F")
   }
 
   def rddPropensity = {
     val cfFeatures = Bytes.toBytes("F")
     val qPropensity = Bytes.toBytes("propensity")
-    val cfr = (row: Result) => {
+    val resultMapper = (row: Result) => {
       val cell = row.getColumnLatestCell(cfFeatures, qPropensity)
       Bytes.toDouble(cell.getValueArray, cell.getValueOffset)
     }
-    rdd[Double](cfr, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "F:propensity")
+    rdd[Double](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "F:propensity")
   }
 
 
