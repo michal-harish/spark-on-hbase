@@ -14,9 +14,8 @@ import org.apache.spark.rdd.RDD
  *
  */
 
-class HBaseTableHKey(sc: SparkContext, tableNameAsString: String, numberOfRegions: Int, cfDescriptors: HColumnDescriptor*)
-                    (implicit reg: HKSREG)
-  extends HBaseTable[HKey](sc, tableNameAsString, numberOfRegions, cfDescriptors:_*) {
+class HBaseTableHKey(sc: SparkContext, tableNameAsString: String)(implicit reg: HKSREG)
+  extends HBaseTable[HKey](sc, tableNameAsString) {
 
   override protected def keyToBytes = (key: HKey) => key.bytes
   protected def bytesToKey = (bytes: Array[Byte]) => HKey(bytes)

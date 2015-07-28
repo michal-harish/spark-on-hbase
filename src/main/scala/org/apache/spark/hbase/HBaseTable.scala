@@ -31,16 +31,13 @@ import scala.reflect.ClassTag
  * .bulkLoad
  * .bulkDelete
  */
-abstract class HBaseTable[K]( @transient private val sc: SparkContext,
-                              val tableNameAsString: String,
-                              val numberOfRegions: Int,
-                              cfDescriptors: HColumnDescriptor*) {
+abstract class HBaseTable[K]( @transient private val sc: SparkContext, val tableNameAsString: String) {
 
   @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
 
-  val tableName = TableName.valueOf(tableNameAsString)
+  val (numberOfRegions, families) = Utils.getTableMetaData(hbaseConf, tableNameAsString)
 
-  val families: Seq[HColumnDescriptor] = cfDescriptors
+  val tableName = TableName.valueOf(tableNameAsString)
 
   implicit val partitioner = new RegionPartitioner(numberOfRegions)
 
@@ -97,76 +94,6 @@ abstract class HBaseTable[K]( @transient private val sc: SparkContext,
       }
     }
   }
-
-  def dropIfExists {
-    val connection = ConnectionFactory.createConnection(hbaseConf)
-    val admin = connection.getAdmin
-    try {
-      if (admin.tableExists(tableName)) {
-        println("DISABLING TABLE " + tableNameAsString)
-        admin.disableTable(tableName)
-        println("DROPPING TABLE " + tableNameAsString)
-        admin.deleteTable(tableName)
-      }
-    } finally {
-      admin.close
-      connection.close
-    }
-  }
-
-  def dropColumnIfExists(family: Array[Byte]): Boolean = {
-    val connection = ConnectionFactory.createConnection(hbaseConf)
-    val admin = connection.getAdmin
-    try {
-      val columns = admin.getTableDescriptor(tableName).getColumnFamilies
-      val cf = Bytes.toString(family)
-      if (columns.exists(_.getNameAsString == cf)) {
-        println(s"DROPPING COLUMN ${cf} FROM TABLE ${tableNameAsString}")
-        admin.deleteColumn(tableName, family)
-        true
-      } else {
-        false
-      }
-    } finally {
-      admin.close
-      connection.close
-    }
-  }
-
-  def createIfNotExists: Boolean = {
-    val connection = ConnectionFactory.createConnection(hbaseConf)
-    val admin = connection.getAdmin
-    try {
-      if (!admin.tableExists(tableName)) {
-        println("CREATING TABLE " + tableNameAsString)
-        families.foreach(family => println(s"WITH COLUMN ${family.getNameAsString} TO TABLE ${tableNameAsString}"))
-        val descriptor = new HTableDescriptor(tableName)
-        families.foreach(f => descriptor.addFamily(f))
-        admin.createTable(descriptor, partitioner.startKey, partitioner.endKey, numberOfRegions)
-        return true
-      } else {
-        //alter columns
-        val existingColumns = admin.getTableDescriptor(tableName).getColumnFamilies
-        families.map(f => {
-          if (!families.exists(_.getNameAsString == f.getNameAsString)) {
-            println(s"ADDING COLUMN ${f.getNameAsString} TO TABLE ${tableNameAsString}")
-            admin.addColumn(tableName, f)
-            true
-          } else if (f.compareTo(families.filter(_.getNameAsString == f.getNameAsString).head) != 0) {
-            println(s"MODIFYING COLUMN ${f.getNameAsString} TO TABLE ${tableNameAsString}")
-            admin.modifyColumn(tableName, f)
-            true
-          } else {
-            false
-          }
-        }).exists(_ == true)
-      }
-    } finally {
-      admin.close
-      connection.close
-    }
-  }
-
 
   def update(family: Array[Byte], updateRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])])(implicit tag: ClassTag[K]): Long = {
     val broadCastConf = new SerializableWritable(hbaseConf)

@@ -22,7 +22,7 @@ extends Serializable with Ordered[HKey] {
   def asString = HKeySpace(keySpace).asString(bytes)
 }
 
-object HKey {
+object HKey extends Serializable {
 
   def apply(keySpace: String, id: String)(implicit reg: HKSREG): HKey = apply(HKeySpace(keySpace), id)
   

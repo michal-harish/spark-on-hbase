@@ -8,7 +8,8 @@ import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.apache.hadoop.hbase.client.ConnectionFactory
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
-import org.apache.hadoop.hbase.{HColumnDescriptor, TableName}
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.hadoop.hbase.{HTableDescriptor, HBaseConfiguration, HColumnDescriptor, TableName}
 import org.apache.hadoop.io.{BytesWritable, NullWritable}
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.keyspace.HKey
@@ -36,13 +37,27 @@ object Utils {
     config
   }
 
-  def getNumRegions(hbaseConf: Configuration, tableName: TableName) = {
-    val connection = ConnectionFactory.createConnection(hbaseConf)
-    val regionLocator = connection.getRegionLocator(tableName)
+  /**
+   * @return (numberOfRegions, columnFamilies)
+   */
+  def getTableMetaData(hbaseConfig: Configuration, tableNameAsString: String): (Int, Seq[HColumnDescriptor]) = {
+    val tableName = TableName.valueOf(tableNameAsString)
+    val connection = ConnectionFactory.createConnection(hbaseConfig)
     try {
-      regionLocator.getStartKeys.length
+      val admin = connection.getAdmin
+      try {
+        val regionLocator = connection.getRegionLocator(tableName)
+        try {
+          val numRegions = regionLocator.getStartKeys.length
+          val desc = admin.getTableDescriptor(tableName)
+          (numRegions, desc.getColumnFamilies)
+        } finally {
+          regionLocator.close
+        }
+      } finally {
+        admin.close
+      }
     } finally {
-      regionLocator.close
       connection.close
     }
   }
@@ -62,24 +77,100 @@ object Utils {
     }
   }
 
-  def column(familyName: Array[Byte],
+  def column(familyName: String,
              inMemory: Boolean,
-             maxTtlSeconds: Int,
+             ttlSeconds: Int,
              bt: BloomType,
-             numVersions: Int,
-             compression: Algorithm,
-             blocksizeBytes: Int = 64 * 1024): HColumnDescriptor = {
+             maxVersions: Int,
+             compression: Algorithm = Algorithm.SNAPPY,
+             blocksize: Int = 64 * 1024): HColumnDescriptor = {
     val family: HColumnDescriptor = new HColumnDescriptor(familyName)
     family.setBlockCacheEnabled(true)
     family.setCompressionType(compression)
     family.setMinVersions(0) // min version overrides the ttl behaviour, i.e. minVersions=1 will always keep the latest cell versions despite the ttl
-    family.setMaxVersions(numVersions)
-    family.setTimeToLive(maxTtlSeconds)
+    family.setMaxVersions(maxVersions)
+    family.setTimeToLive(ttlSeconds)
     family.setInMemory(inMemory)
     family.setBloomFilterType(bt)
-    family.setBlocksize(blocksizeBytes)
+    family.setBlocksize(blocksize)
     family
   }
+
+  def createIfNotExists(sc: SparkContext, tableNameAsString: String, numRegions: Int, families: HColumnDescriptor*): Boolean = {
+    val hbaseConf = initConfig(sc, HBaseConfiguration.create)
+    val connection = ConnectionFactory.createConnection(hbaseConf)
+    val admin = connection.getAdmin
+    val tableName = TableName.valueOf(tableNameAsString)
+    val partitioner = new RegionPartitioner(numRegions)
+    try {
+      if (!admin.tableExists(tableName)) {
+        println("CREATING TABLE " + tableNameAsString)
+        families.foreach(family => println(s"WITH COLUMN ${family.getNameAsString} TO TABLE ${tableNameAsString}"))
+        val descriptor = new HTableDescriptor(tableName)
+        families.foreach(f => descriptor.addFamily(f))
+        admin.createTable(descriptor, partitioner.startKey, partitioner.endKey, numRegions)
+        return true
+      } else {
+        //alter columns
+        val existingColumns = admin.getTableDescriptor(tableName).getColumnFamilies
+        families.map(f => {
+          if (!families.exists(_.getNameAsString == f.getNameAsString)) {
+            println(s"ADDING COLUMN ${f.getNameAsString} TO TABLE ${tableNameAsString}")
+            admin.addColumn(tableName, f)
+            true
+          } else if (f.compareTo(families.filter(_.getNameAsString == f.getNameAsString).head) != 0) {
+            println(s"MODIFYING COLUMN ${f.getNameAsString} TO TABLE ${tableNameAsString}")
+            admin.modifyColumn(tableName, f)
+            true
+          } else {
+            false
+          }
+        }).exists(_ == true)
+      }
+    } finally {
+      admin.close
+      connection.close
+    }
+  }
+
+  def dropIfExists(sc: SparkContext, tableNameAsString: String) {
+    val hbaseConf = initConfig(sc, HBaseConfiguration.create)
+    val connection = ConnectionFactory.createConnection(hbaseConf)
+    val admin = connection.getAdmin
+    val tableName = TableName.valueOf(tableNameAsString)
+    try {
+      if (admin.tableExists(tableName)) {
+        println("DISABLING TABLE " + tableNameAsString)
+        admin.disableTable(tableName)
+        println("DROPPING TABLE " + tableNameAsString)
+        admin.deleteTable(tableName)
+      }
+    } finally {
+      admin.close
+      connection.close
+    }
+  }
+
+  def dropColumnIfExists(table: HBaseTable[_], family: Array[Byte]): Boolean = {
+    val hbaseConf = table.hbaseConf
+    val connection = ConnectionFactory.createConnection(hbaseConf)
+    val admin = connection.getAdmin
+    try {
+      val columns = admin.getTableDescriptor(table.tableName).getColumnFamilies
+      val cf = Bytes.toString(family)
+      if (columns.exists(_.getNameAsString == cf)) {
+        println(s"DROPPING COLUMN ${cf} FROM TABLE ${table.tableNameAsString}")
+        admin.deleteColumn(table.tableName, family)
+        true
+      } else {
+        false
+      }
+    } finally {
+      admin.close
+      connection.close
+    }
+  }
+
   def info(tag: String, rdd: RDD[_]): Unit = {
     println(s"${tag} ${rdd.name} PARTITIONER: ${rdd.partitioner}")
     println(s"${tag} ${rdd.name} NUM.PARTITIONS: ${rdd.partitions.size}")

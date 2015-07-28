@@ -181,11 +181,57 @@
 
     <profiles>
         <profile>
-            <id>demo</id>
+            <id>demo-simple</id>
             <properties>
-                <shell.init.script>demo-init.scala</shell.init.script>
-                <main.jar>spark-hbase-demo</main.jar>
-                <kryo.registrator.class>org.apache.spark.hbase.demo.KryoRegistrator</kryo.registrator.class>
+                <shell.init.script>demo-simple-init.scala</shell.init.script>
+                <main.jar>spark-hbase-demo-simple</main.jar>
+                <kryo.registrator.class></kryo.registrator.class>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-shade-plugin</artifactId>
+                        <version>1.5</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>shade</goal>
+                                </goals>
+                                <configuration>
+                                    <filters>
+                                        <filter>
+                                            <artifact>*:*</artifact>
+                                            <excludes>
+                                                <exclude>org/datanucleus/**</exclude>
+                                                <exclude>META-INF/*.SF</exclude>
+                                                <exclude>META-INF/*.DSA</exclude>
+                                                <exclude>META-INF/*.RSA</exclude>
+                                            </excludes>
+                                        </filter>
+                                    </filters>
+                                    <shadedArtifactAttached>false</shadedArtifactAttached>
+                                    <finalName>${main.jar}</finalName>
+                                    <transformers>
+                                        <transformer
+                                                implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                            <resource>reference.conf</resource>
+                                        </transformer>
+                                    </transformers>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>demo-graph</id>
+            <properties>
+                <shell.init.script>demo-graph-init.scala</shell.init.script>
+                <main.jar>spark-hbase-demo-graph</main.jar>
+                <kryo.registrator.class>org.apache.spark.hbase.examples.graph.KryoRegistrator</kryo.registrator.class>
             </properties>
             <build>
                 <plugins>

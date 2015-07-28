@@ -24,7 +24,7 @@ object HKeySpace {
 
 }
 
-abstract class HKeySpace(val symbol: String) extends java.io.Serializable {
+abstract class HKeySpace(val symbol: String) extends Serializable {
   val i = symbol.hashCode.toShort
 
   def asBytes(id: String): Array[Byte]

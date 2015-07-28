@@ -8,7 +8,7 @@ source "$SCRIPTS/default-spark-env"
 source "$SCRIPTS/options.bash"
 
 CONF_KRYO="spark.serializer=org.apache.spark.serializer.KryoSerializer"
-if [ -n "${kryo.registrator.class}" ]; then CONF_KRYO="spark.kryo.registrator=${kryo.registrator.class}"; fi
+if [ -n "org.apache.spark.hbase.examples.graph.KryoRegistrator" ]; then CONF_KRYO="spark.kryo.registrator=org.apache.spark.hbase.examples.graph.KryoRegistrator"; fi
 $SPARK_HOME/bin/spark-shell \
     --master yarn-client \
     --driver-memory $DRIVER \
@@ -44,8 +44,8 @@ $SPARK_HOME/bin/spark-shell \
     --conf "spark.executorEnv.HADOOP_CONF_DIR=$HADOOP_CONF_DIR" \
     --driver-class-path "/usr/lib/hbase/*:/usr/lib/hbase/lib/htrace-core-3.1.0-incubating.jar:/usr/lib/hbase/lib/guava-12.0.1.jar" \
     --driver-library-path "/usr/lib/hadoop/lib/native" \
-    -i "$SCRIPTS/${shell.init.script}" \
-    --jars "$TARGET/${main.jar}.jar"
+    -i "$SCRIPTS/demo-graph-init.scala" \
+    --jars "$TARGET/spark-hbase-demo-graph.jar"
 
 # Dynamic allocation requires external shuffle service
 #    --conf "spark.dynamicAllocation.enabled=true" \

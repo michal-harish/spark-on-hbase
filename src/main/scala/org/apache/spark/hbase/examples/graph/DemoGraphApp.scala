@@ -13,7 +13,7 @@ import org.apache.spark.rdd.RDD
  *
  * When launched as a spark-submit, the companion object DemoApp is started
  */
-class DemoApp(sc: SparkContext) {
+class DemoGraphApp(sc: SparkContext) {
 
   implicit val context = sc
 
@@ -22,42 +22,21 @@ class DemoApp(sc: SparkContext) {
     new HKeySpaceUUID("u").keyValue
   )
 
-  val graph = new HGraph(context, "demo-graph", 256)
+  val graph = new HGraph(context, "demo-graph")
 
   implicit val partitioner = graph.partitioner
+
+
 
   def help = {
     println("Spark-on-HBase Graph Demo shell help:")
     println(" help - print this usage information")
-    println(" open(<hbaseTableName>) - get a basic HBaseTable for any existing table for which key bytes can be represented as String")
+    println(" create - create the underlying HBase table for the graph object")
     println(" graph - reference to the main graph instance (HGraph extends HBaseTable) ")
-    println(" graph.createIfNotExists - create the underlying HBase table")
   }
 
-  def open(hbaseTableName: String): HBaseTable[String] = {
-    val tableName = TableName.valueOf(hbaseTableName)
-    val hbaseConfig = Utils.initConfig(context, HBaseConfiguration.create)
-    val connection = ConnectionFactory.createConnection(hbaseConfig)
-    try {
-      val admin = connection.getAdmin
-      try {
-        val regionLocator = connection.getRegionLocator(tableName)
-        try {
-          val numRegions = regionLocator.getStartKeys.length
-          val desc = admin.getTableDescriptor(tableName)
-          new HBaseTable[String](context, tableName.getNameAsString, numRegions, desc.getColumnFamilies: _*) {
-            override protected def keyToBytes = (rowKey: String) => rowKey.getBytes
-            override protected def bytesToKey = (key: Array[Byte]) => new String(key)
-          }
-        } finally {
-          regionLocator.close
-        }
-      } finally {
-        admin.close
-      }
-    } finally {
-      connection.close
-    }
+  def create = {
+    Utils.createIfNotExists(sc, graph.tableNameAsString, numRegions = 256, graph.schema:_*)
   }
 
   /**
@@ -151,14 +130,14 @@ class DemoApp(sc: SparkContext) {
 /**
  * object DemoApp is an execution start point for spark-submit
  */
-object DemoApp extends App {
+object DemoGraphApp extends App {
   /** Execution sequence **/
   try {
     if (args.length == 0) {
       throw new IllegalArgumentException
     }
     val context = new SparkContext() // hoping to get all configuration passed from scripts/spark-submit
-    val demo = new DemoApp(context)
+    val demo = new DemoGraphApp(context)
     try {
       val a = args.iterator
       while (a.hasNext) {

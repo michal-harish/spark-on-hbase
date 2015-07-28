@@ -94,12 +94,12 @@ class HE(val bytes: Array[Byte], val vendorCode: Short, val ts: Long) extends ja
 }
 
 
-class HGraph(sc: SparkContext, tableName: String, numberOfRegions: Int)(implicit reg: HKSREG)
-  extends HBaseTableHKey(sc, tableName: String, numberOfRegions
-  , Utils.column(Bytes.toBytes("N"), true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
-  , Utils.column(Bytes.toBytes("E"), true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
-  , Utils.column(Bytes.toBytes("F"), false, 86400 * 90, BloomType.ROWCOL, 1, Algorithm.SNAPPY, 64 * 1024))
-  with AGraph[HE] {
+class HGraph(sc: SparkContext, tableName: String)(implicit reg: HKSREG) extends HBaseTableHKey(sc, tableName: String) with AGraph[HE] {
+
+  val schema = List(
+      Utils.column("N", true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
+    , Utils.column("E", true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
+    , Utils.column("F", false, 86400 * 90, BloomType.ROWCOL, 1, Algorithm.SNAPPY, 64 * 1024))
 
   type FEATURES = Map[String, Array[Byte]]
   type STATS = LinkedHashMap[String, Accumulator[Long]]
@@ -206,7 +206,6 @@ class HGraph(sc: SparkContext, tableName: String, numberOfRegions: Int)(implicit
   }
 
   def copyNet(dest: HGraph, closeContextOnExit: Boolean = false): Long = {
-    dest.createIfNotExists
     val update: RDD[(HKey, EDGES)] = rddNet
       .leftOuterJoin(dest.rddNet)
       .mapValues({ case (left, right) => right match {
