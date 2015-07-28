@@ -9,7 +9,7 @@ It can be used in 3 major ways:
 
 There is a couple of implcit conversion functions for HBaseRDD in __`HBaseRDDFunctions`__ which provide `.join` and `.lookup` alternatives. The `.join` uses a __`HBaseJoin`__ abstract function which is implemented in 2 versions, both resulting in a single-stage join regardless of partitioners used. One is for situations where the right table is very large portion of the left hbase table - __`HBaseJoinRangeScan` and the other is for situtations where the right table is a small fraction of the left table - __`HBaseJoinMultiGet`. Lookup is an additional functionality, similar to join except where the argument rdd is treated as to be 'updated' or 'looked-up' where the value of the Option is None - this is for highly iterative algorithms which use HBase as state.
 
-# quick start
+# quick start (on YARN)
 
 First thing you'll need is a deafult-spark-env, there's a template you can copy and then modify to match your environment.
 
@@ -22,9 +22,7 @@ On the yarn nodes as well as driver, the following files should be distributed:
 Further, on the driver you'll need the distributions of spark and hadoop as defined in the pom.xml and on the path defined by `$SPARK_HOME/` and `$HADOOP_HOME` in the spark-default-env respectively
 NOTE: that the scripts predefined here for spark-shell and spark-submit define the spark master as yarn-client so the driver is the computer from which you are building the demo app.
 
-If you don't have your spark assembly jar ready on the driver or available in hdfs for executors, you'll first need to build it and put it on the driver and into hdfs:
-
-```./scripts/build spark```
+If you don't have your spark assembly jar ready on the driver or available in hdfs for executors, you'll first need to build it and put it on the driver and into hdfs.
 
 # quick start - 1 basic use case
 
