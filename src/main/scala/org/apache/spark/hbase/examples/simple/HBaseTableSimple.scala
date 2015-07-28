@@ -31,10 +31,12 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnD
 
   def rddNumCells: HBaseRDD[String, Short] = {
     val cfr = (row: Result) => {
-      var numCells: Short = 0
+      var numCells: Int = 0
       val scanner = row.cellScanner
-      while (scanner.advance) numCells += 1
-      numCells
+      while (scanner.advance) {
+        numCells = numCells + 1
+      }
+      numCells.toShort
     }
     rdd[Short](cfr, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP)
   }
