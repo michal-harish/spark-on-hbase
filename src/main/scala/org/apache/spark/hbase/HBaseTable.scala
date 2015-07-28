@@ -27,8 +27,6 @@ import scala.reflect.ClassTag
  * .update
  * .increment
  * .delete
- * .join
- * .lookup
  * .bulkLoad
  * .bulkDelete
  */
