@@ -1,4 +1,4 @@
-package org.apache.spark.hbase.demo
+package org.apache.spark.hbase.examples.graph
 
 import org.apache.spark.hbase.RegionPartitioner
 import org.apache.spark.hbase.keyspace.HKey

@@ -1,4 +1,4 @@
-package org.apache.spark.hbase.demo
+package org.apache.spark.hbase.examples.graph
 
 import java.io.{BufferedWriter, OutputStreamWriter}
 
@@ -7,7 +7,7 @@ import org.apache.hadoop.hbase.client.Result
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{Cell, CellUtil, HBaseConfiguration, HConstants}
+import org.apache.hadoop.hbase.{Cell, CellUtil, HConstants}
 import org.apache.spark.hbase._
 import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
 import org.apache.spark.hbase.keyspace.{HBaseTableHKey, HKey, HKeySpace}
@@ -99,7 +99,6 @@ class HGraph(sc: SparkContext, tableName: String, numberOfRegions: Int)(implicit
   , Utils.column(Bytes.toBytes("N"), true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
   , Utils.column(Bytes.toBytes("E"), true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
   , Utils.column(Bytes.toBytes("F"), false, 86400 * 90, BloomType.ROWCOL, 1, Algorithm.SNAPPY, 64 * 1024))
-  //FIXME liblz4.so not available in cdh5 distribution so using snappy for now
   with AGraph[HE] {
 
   type FEATURES = Map[String, Array[Byte]]

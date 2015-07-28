@@ -1,4 +1,4 @@
-package org.apache.spark.hbase.demo
+package org.apache.spark.hbase.examples.simple
 
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType

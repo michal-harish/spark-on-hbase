@@ -1,6 +1,6 @@
-package org.apache.spark.hbase.demo
+package org.apache.spark.hbase.examples.graph
 
-import org.apache.hadoop.hbase.client.{Result, ConnectionFactory}
+import org.apache.hadoop.hbase.client.ConnectionFactory
 import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._

@@ -1,7 +1,6 @@
-package org.apache.spark.hbase.demo
+package org.apache.spark.hbase.examples.graph
 
 import com.esotericsoftware.kryo.Kryo
-import org.apache.spark.hbase._
 import org.apache.spark.hbase.keyspace._
 
 class KryoRegistrator extends org.apache.spark.serializer.KryoRegistrator {
