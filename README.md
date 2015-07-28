@@ -7,7 +7,7 @@ It can be used in 3 major ways:
 - __Standard__: In the more typical case, by extending HBaseRDD and HBaseTable to provide mapping of raw key bytes and hbase result to some more meaningful types. You can learn about this method by studying the demo-simple application
 - __Specialised/Experimental__: Using the keyspace extension to the basic HBaseRDD and HBaseTable. This extension cannot be used on existing tables because it uses predefined key structure which aims to get the most from both spark and hbase perspective. You can learn more about this method by studying the demo-graph application (the demo is broken in the TODOs below)
 
-There is a couple of implcit conversion functions for HBaseRDD in __`HBaseRDDFunctions`__ which provide `.join` and `.lookup` alternatives. The `.join` uses a __`HBaseJoin`__ abstract function which is implemented in 2 versions, both resulting in a single-stage join regardless of partitioners used. One is for situations where the right table is very large portion of the left hbase table - __`HBaseJoinRangeScan` and the other is for situtations where the right table is a small fraction of the left table - __`HBaseJoinMultiGet`. Lookup is an additional functionality, similar to join except where the argument rdd is treated as to be 'updated' or 'looked-up' where the value of the Option is None - this is for highly iterative algorithms which use HBase as state.
+There is a couple of implcit conversion functions for HBaseRDD in __`HBaseRDDFunctions`__ which provide `.join` and `.lookup` alternatives. The `.join` uses a __`HBaseJoin`__ abstract function which is implemented in 2 versions, both resulting in a single-stage join regardless of partitioners used. One is for situations where the right table is very large portion of the left hbase table - __`HBaseJoinRangeScan` and the other is for situtations where the right table is a small fraction of the left table - __`HBaseJoinMultiGet`. (The mechanism for choosing between the types of join is not done, i.e. at the moment all the joins are mutli-get, see TODO below) Lookup is an additional functionality, similar to join except where the argument rdd is treated as to be 'updated' or 'looked-up' where the value of the Option is None - this is for highly iterative algorithms which use HBase as state.
 
 # quick start (on YARN)
 
@@ -61,7 +61,10 @@ You can then run the demo appliation as a shell:
 
 ``` ./scripts/demo-simple-shell ```
 
-# quick start - 3 - specialise keyspace implementation
+# quick start - 3 - large scale operations
+  TODO demo and section about joining and transforming large tables and using bulk operations
+
+# quick start - 4 - experimental stuff
 
 This example makes use of the org.apache.spark.hbase.keyspace which provides specialised __`HKey`__ implementation that
 addresses several scalability issues and general integration between spark and hbase. It also provides specialised
@@ -81,6 +84,8 @@ You can then run the demo appliation as a shell:
 
 # TODOs
 
+- Mechanism for choosing HBaseJoin implementation must be done per operation, not simply configuration variable
+  because the type of join depends on the relative volume of the RDDs not location or resource. 
 - Write more comprehensive tutorial, generating larger table, writing a distributed algorithm over one column family
   and bulk-loading the result mutation into the second column family.
 - Add implicit Ordering[K] for all HBaseRDD representations since HBase is ordered by definition
