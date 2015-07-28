@@ -67,10 +67,10 @@ This example makes use of the org.apache.spark.hbase.keyspace which provides spe
 addresses several scalability issues and general integration between spark and hbase. It also provides specialised
 __`HBaseRDDHKey`__ and __`HBaseRDDTableHKey`__ which all share the concept of HKey. The main idea here is to be able
  to mix different key types while preserving even distribution of records across hbase regions. By using the form
- `[4-byte-salt][2-byte-keyspace-symbol][n-byte-key-value]` it also possible to the hbase server-side fuzzy filtering
- for a specific 2-byte symbol by ignoring the first 4 bytes and matching 5th and 6th. Each implementation of HKeySpace
- must provide serde methods for generating hash and value into pre-allocated byte array by the HKeySpace abstraction.
- More information is in the comments of the demo application and the package classes.
+ 
+ ``` [4-byte-hash] [2-byte-keyspace-symbol] [n-byte-key-value] ``` 
+ 
+ it also possible to do the hbase server-side fuzzy filtering for a specific 2-byte symbol by ignoring the first 4 bytes and matching 5th and 6th. Each implementation of HKeySpace must provide serde methods for generating hash and value into pre-allocated byte array by the HKeySpace abstraction. More information is in the comments of the demo application and the package classes.
 
 Run the following script which will package the demo application in org.apache.spark.hbase.examples.demo.graph
 ```./scripts/build demo-graph```
