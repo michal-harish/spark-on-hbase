@@ -5,7 +5,7 @@ Its main concepts are __`HBaseRDD`__ and __`HBaseTable`__. `HBaseRDD` is used fo
 It can be used in 3 major ways:
 - __Basic__: In the most basic case it can be used to simply map existing hbase tables to HBaseRDD which will result a simple pair RDD[(Array[Byte], hbase.client.Result)]. These can be filtered, transformed,.. as any other RDD and the result can be for example given to HBaseTable as a mutation to execute on the same underlying table.
 - __Standard__: In the more typical case, by extending HBaseRDD and HBaseTable to provide mapping of raw key bytes and hbase result to some more meaningful types. You can learn about this method by studying the demo-simple application
-- __Specialised/Experimental__: Using the keyspace extension to the basic HBaseRDD and HBaseTable. This extension cannot be used on existing tables because it uses predefined key structure which aims to get the most from both spark and hbase perspective. You can learn more about this method by studing the demo-graph application.
+- __Specialised/Experimental__: Using the keyspace extension to the basic HBaseRDD and HBaseTable. This extension cannot be used on existing tables because it uses predefined key structure which aims to get the most from both spark and hbase perspective. You can learn more about this method by studying the demo-graph application (the demo is broken in the TODOs below)
 
 There is a couple of implcit conversion functions for HBaseRDD in __`HBaseRDDFunctions`__ which provide `.join` and `.lookup` alternatives. The `.join` uses a __`HBaseJoin`__ abstract function which is implemented in 2 versions, both resulting in a single-stage join regardless of partitioners used. One is for situations where the right table is very large portion of the left hbase table - __`HBaseJoinRangeScan` and the other is for situtations where the right table is a small fraction of the left table - __`HBaseJoinMultiGet`. Lookup is an additional functionality, similar to join except where the argument rdd is treated as to be 'updated' or 'looked-up' where the value of the Option is None - this is for highly iterative algorithms which use HBase as state.
 
@@ -81,6 +81,7 @@ You can then run the demo appliation as a shell:
 
 # TODOs
 
-- Unify key value mappers under a single interface
-- Add implicit Ordering[K] for all HBaseRDD representations, as HBase is ordered by definition
+- Write more comprehensive tutorial, generating larger table, writing a distributed algorithm over one column family
+  and bulk-loading the result mutation into the second column family.
+- Add implicit Ordering[K] for all HBaseRDD representations since HBase is ordered by definition
 - Refactor for enabling forks and finish off the graph demo which currently doesn't really work
