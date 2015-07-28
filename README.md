@@ -56,11 +56,11 @@ Extending HBaseRDD class to provide richer semantics. The example is implemented
 
 Run the following script which will package the demo application in org.apache.spark.hbase.examples.demo.simple
 
-```./scripts/build demo-simple```
+``` ./scripts/build demo-simple ```
 
 You can then run the demo appliation as a shell:
 
-```./scripts/demo-simple-shell```
+``` ./scripts/demo-simple-shell ```
 
 # quick start - 3 - specialise keyspace implementation
 
