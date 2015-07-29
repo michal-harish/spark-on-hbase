@@ -37,25 +37,30 @@ object Utils {
     config
   }
 
-  /**
-   * @return (numberOfRegions, columnFamilies)
-   */
-  def getTableMetaData(hbaseConfig: Configuration, tableNameAsString: String): (Int, Seq[HColumnDescriptor]) = {
+  def getColumnFamilies(hbaseConfig: Configuration, tableNameAsString: String): Seq[HColumnDescriptor] = {
     val tableName = TableName.valueOf(tableNameAsString)
     val connection = ConnectionFactory.createConnection(hbaseConfig)
     try {
       val admin = connection.getAdmin
       try {
-        val regionLocator = connection.getRegionLocator(tableName)
-        try {
-          val numRegions = regionLocator.getStartKeys.length
-          val desc = admin.getTableDescriptor(tableName)
-          (numRegions, desc.getColumnFamilies)
-        } finally {
-          regionLocator.close
-        }
+        admin.getTableDescriptor(tableName).getColumnFamilies
       } finally {
         admin.close
+      }
+    } finally {
+      connection.close
+    }
+  }
+
+  def getNumberOfRegions(hbaseConfig: Configuration, tableNameAsString: String): Int = {
+    val tableName = TableName.valueOf(tableNameAsString)
+    val connection = ConnectionFactory.createConnection(hbaseConfig)
+    try {
+      val regionLocator = connection.getRegionLocator(tableName)
+      try {
+        regionLocator.getStartKeys.length
+      } finally {
+        regionLocator.close
       }
     } finally {
       connection.close

@@ -94,7 +94,7 @@ class HE(val bytes: Array[Byte], val vendorCode: Short, val ts: Long) extends ja
 }
 
 
-class HGraph(sc: SparkContext, tableName: String)(implicit reg: HKSREG) extends HBaseTableHKey(sc, tableName: String) with AGraph[HE] {
+class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: HKSREG) extends HBaseTableHKey(sc, tableName: String) with AGraph[HE] {
 
   val schema = List(
       Utils.column("N", true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
@@ -205,7 +205,7 @@ class HGraph(sc: SparkContext, tableName: String)(implicit reg: HKSREG) extends 
     super.increment(cfFeatures, Bytes.toBytes(feature), incRdd)
   }
 
-  def copyNet(dest: HGraph, closeContextOnExit: Boolean = false): Long = {
+  def copyNet(dest: HGraphTable, closeContextOnExit: Boolean = false): Long = {
     val update: RDD[(HKey, EDGES)] = rddNet
       .leftOuterJoin(dest.rddNet)
       .mapValues({ case (left, right) => right match {
