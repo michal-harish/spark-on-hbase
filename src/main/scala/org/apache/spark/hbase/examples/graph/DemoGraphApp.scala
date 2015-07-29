@@ -22,7 +22,7 @@ class DemoGraphApp(sc: SparkContext) {
     new HKeySpaceUUID("u").keyValue
   )
 
-  val graph = new HGraph(context, "demo-graph")
+  val graph = new HGraphTable(context, "demo-graph")
 
   implicit val partitioner = graph.partitioner
 

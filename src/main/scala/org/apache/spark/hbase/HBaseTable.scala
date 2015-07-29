@@ -37,7 +37,7 @@ abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString
 
   val tableName = TableName.valueOf(tableNameAsString)
 
-  val (numberOfRegions, families) = Utils.getTableMetaData(hbaseConf, tableNameAsString)
+  val numberOfRegions = Utils.getNumberOfRegions(hbaseConf, tableNameAsString)
 
   val partitioner = new RegionPartitioner(numberOfRegions)
 
@@ -206,7 +206,7 @@ abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString
 
   def bulkDelete(family: Array[Byte], deleteRdd: RDD[(K, Seq[Array[Byte]])], completeAsync: Boolean): Long = {
     val acc = sc.accumulator(0L, s"HBATable ${tableName} delete count")
-    val cfs = families.map(_.getName)
+    val cfs = Utils.getColumnFamilies(hbaseConf, tableNameAsString).map(_.getName)
     val keyToBytes = this.keyToBytes
     implicit val keyValueOrdering = KeyValueOrdering
 
