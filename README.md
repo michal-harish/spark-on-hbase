@@ -84,7 +84,7 @@ You can then run the demo appliation as a shell:
 
 # TODOs
 
-- Right now the HBaseRDDHkey is trying to serialise HBaseTableHKey which is an outerclass for the bytesToKey but unsure what is different from the HBaseTableSimple in the demo which doesn't have serial.issue with the same closures.
+- temporarily added serialization to HBaseTable to have it working, but only HBaseRDD should assumed to be serialized, need refactoring the mapper interface
 - Mechanism for choosing HBaseJoin implementation must be done per operation, not simply configuration variable because the type of join depends on the relative volume of the RDDs not location or resource - but ideally it should be done by estimation, not requiring any control argument
 - Write more comprehensive tutorial, generating larger table, writing a distributed algorithm over one column family and bulk-loading the result mutation into the second column family.
 - Add implicit Ordering[K] for all HBaseRDD representations since HBase is ordered by definition

@@ -18,15 +18,17 @@ class HBaseTableHKey(sc: SparkContext, tableNameAsString: String)(implicit reg: 
   extends HBaseTable[HKey](sc, tableNameAsString) {
 
   override protected def keyToBytes: HKey => Array[Byte] = (key: HKey) => key.bytes
+
   override protected def bytesToKey: Array[Byte] => HKey = (bytes: Array[Byte]) => HKey(bytes)
 
+  @transient
   def rdd(keyIdSpace: Short, columns: String*): RDD[(HKey, Result)] = {
     new HBaseRDDHKey(sc, tableNameAsString, keyIdSpace, columns: _*)
   }
 
+  @transient
   def rdd(keyIdSpace: Short, cf: Array[Byte], maxStamp: Long): RDD[(HKey, Result)] = {
     new HBaseRDDHKey(sc, tableNameAsString, keyIdSpace, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf))
   }
-
 
 }

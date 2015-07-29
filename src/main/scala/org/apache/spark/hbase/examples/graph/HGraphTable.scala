@@ -96,6 +96,7 @@ class HE(val bytes: Array[Byte], val vendorCode: Short, val ts: Long) extends ja
 
 class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: HKSREG) extends HBaseTableHKey(sc, tableName: String) with AGraph[HE] {
 
+  @transient
   val schema = List(
       Utils.column("N", true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
     , Utils.column("E", true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
@@ -108,6 +109,7 @@ class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: HKSREG) ext
   val cfEval = Bytes.toBytes("E")
   val cfFeatures = Bytes.toBytes("F")
 
+  @transient
   val propsFile = new Path(s"/hgraph/${tableName}") //TODO configurable path for hgraph properties
   val props = scala.collection.mutable.LinkedHashMap[String, String]()
 

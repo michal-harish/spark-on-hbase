@@ -22,6 +22,12 @@ object HBaseTableSimple {
   )
 }
 
+//object HBaseStringKeyMapper extends HBaseKeyMapper[String] {
+//  override def bytesToKey = (bytes: Array[Byte]) => new String(bytes)
+//
+//  override def keyToBytes = (key: String) => key.getBytes
+//}
+
 class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnDescriptor*)
   extends HBaseTable[String](sc, tableNameAsString) {
 
@@ -29,6 +35,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnD
 
   override protected def bytesToKey = (bytes: Array[Byte]) => new String(bytes)
 
+  @transient
   def rddNumCells: HBaseRDD[String, Short] = {
     val resultMapper = (row: Result) => {
       var numCells: Int = 0
@@ -41,7 +48,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnD
     rdd[Short](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP)
   }
 
-
+  @transient
   def rddTags: HBaseRDD[String, List[String]] = {
     val cfTags = Bytes.toBytes("T")
     val resultMapper = (row: Result) => {
@@ -59,6 +66,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnD
     rdd[List[String]](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "T")
   }
 
+  @transient
   def rddFeatures = {
     val cfFeatures = Bytes.toBytes("F")
     val resultMapper = (row: Result) => {
@@ -77,6 +85,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnD
     rdd[Map[String, Double]](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "F")
   }
 
+  @transient
   def rddPropensity = {
     val cfFeatures = Bytes.toBytes("F")
     val qPropensity = Bytes.toBytes("propensity")
@@ -86,7 +95,6 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnD
     }
     rdd[Double](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "F:propensity")
   }
-
 
 }
 

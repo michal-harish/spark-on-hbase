@@ -19,6 +19,20 @@ import scala.reflect.ClassTag
 
 /**
  * Created by mharis on 27/07/15.
+ */
+//trait HBaseKeyMapper[K] extends Serializable {
+//  def keyToBytes: K => Array[Byte]
+//
+//  def bytesToKey: Array[Byte] => K
+//}
+//
+//trait HBaseResultMapper[V] extends Serializable {
+//  def resultToValue: Result => V
+//}
+//
+//trait HBaseMapper[K,V] extends HBaseKeyMapper[K] with HBaseResultMapper[V]
+
+/**
  * This class is for rdd-based mutations to the underlying hbase table.
  *
  * Once application has an instance of HBaseTable extension this is the summary of methods that can be invoked on that instance:
@@ -30,41 +44,44 @@ import scala.reflect.ClassTag
  * .bulkLoad
  * .bulkDelete
  */
+abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tableNameAsString: String) extends Serializable {
 
-abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString: String) {
-
+  @transient
   val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
 
+  @transient
   val tableName = TableName.valueOf(tableNameAsString)
 
   val numberOfRegions = Utils.getNumberOfRegions(hbaseConf, tableNameAsString)
 
+  @transient
   val partitioner = new RegionPartitioner(numberOfRegions)
 
   protected def keyToBytes: K => Array[Byte]
 
   protected def bytesToKey: Array[Byte] => K
 
+  @transient
   def rdd = {
     rdd[Result]((result: Result) => result, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP)
   }
 
+  @transient
   def rdd(columns: String*) = {
     rdd[Result]((result: Result) => result, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
   }
 
+  @transient
   def rdd(minStamp: Long, maxStamp: Long, columns: String*) = {
     rdd[Result]((result: Result) => result, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
   }
 
+  @transient
   def rdd[V](valueMapper: (Result) => V, minStamp: Long, maxStamp: Long, columns: String*) = {
+    new HBaseRDD[K,V](sc, tableNameAsString, minStamp, maxStamp, columns: _*) {
+      override def bytesToKey = HBaseTable.this.bytesToKey
 
-    new HBaseRDD[K, V](sc, tableNameAsString, minStamp, maxStamp, columns: _*) {
-      val bytesToKeyCopy1 = HBaseTable.this.bytesToKey
-      val keyToBytesCopy1 = HBaseTable.this.keyToBytes
-      override def bytesToKey = bytesToKeyCopy1
-
-      override def keyToBytes = keyToBytesCopy1
+      override def keyToBytes = HBaseTable.this.keyToBytes
 
       override def resultToValue = valueMapper
     }
@@ -91,6 +108,7 @@ abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString
     }
   }
 
+  @transient
   def update(family: Array[Byte], updateRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])])(implicit tag: ClassTag[K]): Long = {
     val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
@@ -125,7 +143,7 @@ abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString
     updateCount.value
   }
 
-  def increment(family: Array[Byte], qualifier: Array[Byte], incrementRdd: RDD[(K, Long)])(implicit tag: ClassTag[K]) {
+  @transient def increment(family: Array[Byte], qualifier: Array[Byte], incrementRdd: RDD[(K, Long)])(implicit tag: ClassTag[K]) {
     val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
     val keyToBytes = this.keyToBytes
@@ -149,6 +167,7 @@ abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString
     })
   }
 
+  @transient
   def delete(family: Array[Byte], deleteRdd: RDD[(K, Seq[Array[Byte]])])(implicit tag: ClassTag[K]): Long = {
     val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
@@ -182,6 +201,7 @@ abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString
     toDeleteCount.value
   }
 
+  @transient
   def bulkLoad(family: Array[Byte], bulkRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])], completeAsync: Boolean): Long = {
     val acc = sc.accumulator(0L, s"HBATable ${tableName} load count")
     val keyToBytes = this.keyToBytes
@@ -204,6 +224,7 @@ abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString
     acc.value
   }
 
+  @transient
   def bulkDelete(family: Array[Byte], deleteRdd: RDD[(K, Seq[Array[Byte]])], completeAsync: Boolean): Long = {
     val acc = sc.accumulator(0L, s"HBATable ${tableName} delete count")
     val cfs = Utils.getColumnFamilies(hbaseConf, tableNameAsString).map(_.getName)
@@ -231,6 +252,7 @@ abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString
     acc.value
   }
 
+  @transient
   protected[spark] def bulk(hFileRdd: RDD[(ImmutableBytesWritable, KeyValue)], completeAsync: Boolean) = {
     val conf = hbaseConf
     val fs = FileSystem.get(conf)
@@ -293,6 +315,7 @@ abstract class HBaseTable[K](private val sc: SparkContext, val tableNameAsString
   /**
    * When using bulk operations the shell/job must be run as hbase user unfortunately
    */
+  @transient
   final def verifyFileStatus(fs: FileSystem, f: FileStatus, verifyOwner: String): Unit = {
     if (f.isDirectory) fs.listStatus(f.getPath).foreach(f1 => verifyFileStatus(fs, f1, verifyOwner))
     if (f.getOwner != verifyOwner) throw new IllegalStateException(s"This job must be run as `${verifyOwner}` user")
