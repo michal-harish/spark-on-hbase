@@ -78,10 +78,12 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   @transient
   def rdd[V](valueMapper: (Result) => V, minStamp: Long, maxStamp: Long, columns: String*) = {
+    val bytesToKeyCopy = HBaseTable.this.bytesToKey
+    val keyToBytesCopy = HBaseTable.this.keyToBytes
     new HBaseRDD[K,V](sc, tableNameAsString, minStamp, maxStamp, columns: _*) {
-      override def bytesToKey = HBaseTable.this.bytesToKey
+      override def bytesToKey = bytesToKeyCopy
 
-      override def keyToBytes = HBaseTable.this.keyToBytes
+      override def keyToBytes = keyToBytesCopy
 
       override def resultToValue = valueMapper
     }
