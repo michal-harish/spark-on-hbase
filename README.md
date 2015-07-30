@@ -9,6 +9,8 @@ It can be used in 3 major ways:
 
 There is a couple of implcit conversion functions for HBaseRDD in __`HBaseRDDFunctions`__ which provide `.join` and `.lookup` alternatives. The `.join` uses a __`HBaseJoin`__ abstract function which is implemented in 2 versions, both resulting in a single-stage join regardless of partitioners used. One is for situations where the right table is very large portion of the left hbase table - __`HBaseJoinRangeScan` and the other is for situtations where the right table is a small fraction of the left table - __`HBaseJoinMultiGet`. (The mechanism for choosing between the types of join is not done, i.e. at the moment all the joins are mutli-get, see TODO below) Lookup is an additional functionality, similar to join except where the argument rdd is treated as to be 'updated' or 'looked-up' where the value of the Option is None - this is for highly iterative algorithms which use HBase as state.
 
+__`bulkLoad`__ and __`bulkDelete`__ are available to generate HFiles directly for large mutations.
+__NOTE:__ Due to the way how HBase handles the bulk files submission, the spark shell or job __needs to be started as `hbase` user__
 # quick start (on YARN)
 
 First thing you'll need is a deafult-spark-env, there's a template you can copy and then modify to match your environment.
@@ -83,7 +85,7 @@ You can then run the demo appliation as a shell:
 `./scripts/demo-graph-shell`
 
 # TODOs
-
+- figure out a work-around for the bulk operations requiring the process to run under hbase user
 - temporarily added serialization to HBaseTable to have it working, but only HBaseRDD should assumed to be serialized, need refactoring the mapper interface
 - Mechanism for choosing HBaseJoin implementation must be done per operation, not simply configuration variable because the type of join depends on the relative volume of the RDDs not location or resource - but ideally it should be done by estimation, not requiring any control argument
 - Write more comprehensive tutorial, generating larger table, writing a distributed algorithm over one column family and bulk-loading the result mutation into the second column family.

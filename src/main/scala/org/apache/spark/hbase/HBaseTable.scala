@@ -20,25 +20,14 @@ import scala.reflect.ClassTag
 
 /**
  * Created by mharis on 27/07/15.
- */
-//trait HBaseKeyMapper[K] extends Serializable {
-//  def keyToBytes: K => Array[Byte]
-//
-//  def bytesToKey: Array[Byte] => K
-//}
-//
-//trait HBaseResultMapper[V] extends Serializable {
-//  def resultToValue: Result => V
-//}
-//
-//trait HBaseMapper[K,V] extends HBaseKeyMapper[K] with HBaseResultMapper[V]
-
-/**
+ *
  * This class is for rdd-based mutations to the underlying hbase table.
  *
  * Once application has an instance of HBaseTable extension this is the summary of methods that can be invoked on that instance:
  *
- * .rdd .rdd(cf*) .rdd(keySpace, cf*)
+ * .rdd
+ * .rdd(cf*)
+ * .rdd(minStamp, maxStamp, cf*)
  * .update
  * .increment
  * .delete
@@ -47,16 +36,13 @@ import scala.reflect.ClassTag
  */
 abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tableNameAsString: String) extends Serializable {
 
-  @transient
-  val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
+  @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
 
-  @transient
-  val tableName = TableName.valueOf(tableNameAsString)
+  @transient val tableName = TableName.valueOf(tableNameAsString)
 
   val numberOfRegions = Utils.getNumberOfRegions(hbaseConf, tableNameAsString)
 
-  @transient
-  val partitioner = new RegionPartitioner(numberOfRegions)
+  @transient val partitioner = new RegionPartitioner(numberOfRegions)
 
   protected def keyToBytes: K => Array[Byte]
 
@@ -81,27 +67,6 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
       override def keyToBytes = HBaseTable.this.keyToBytes
 
       override def resultToValue = valueMapper
-    }
-  }
-
-
-  /**
-   * bulk load operations for put and delete which generate directly HFiles
-   * - requires the job/shell to be run us hbase user
-   * - completeAsync - tells the job to complete the incremental load in the background or do it synchronously
-   */
-  val KeyValueOrdering = new Ordering[KeyValue] {
-    override def compare(a: KeyValue, b: KeyValue) = {
-      Bytes.compareTo(a.getRowArray, a.getRowOffset, a.getRowLength, b.getRowArray, b.getRowOffset, b.getRowLength) match {
-        case 0 => Bytes.compareTo(a.getFamilyArray, a.getFamilyOffset, a.getFamilyLength, b.getFamilyArray, b.getFamilyOffset, b.getFamilyLength) match {
-          case 0 => Bytes.compareTo(a.getQualifierArray, a.getQualifierOffset, a.getQualifierLength, b.getQualifierArray, b.getQualifierOffset, b.getQualifierLength) match {
-            case 0 => if (a.getTimestamp < b.getTimestamp) 1 else if (a.getTimestamp > b.getTimestamp) -1 else 0
-            case c: Int => c
-          }
-          case c: Int => c
-        }
-        case c: Int => c
-      }
     }
   }
 
@@ -194,6 +159,26 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
       }
     })
     toDeleteCount.value
+  }
+
+  /**
+   * bulk load operations for put and delete which generate directly HFiles
+   * - requires the job/shell to be run us hbase user
+   * - completeAsync - tells the job to complete the incremental load in the background or do it synchronously
+   */
+  val KeyValueOrdering = new Ordering[KeyValue] {
+    override def compare(a: KeyValue, b: KeyValue) = {
+      Bytes.compareTo(a.getRowArray, a.getRowOffset, a.getRowLength, b.getRowArray, b.getRowOffset, b.getRowLength) match {
+        case 0 => Bytes.compareTo(a.getFamilyArray, a.getFamilyOffset, a.getFamilyLength, b.getFamilyArray, b.getFamilyOffset, b.getFamilyLength) match {
+          case 0 => Bytes.compareTo(a.getQualifierArray, a.getQualifierOffset, a.getQualifierLength, b.getQualifierArray, b.getQualifierOffset, b.getQualifierLength) match {
+            case 0 => if (a.getTimestamp < b.getTimestamp) 1 else if (a.getTimestamp > b.getTimestamp) -1 else 0
+            case c: Int => c
+          }
+          case c: Int => c
+        }
+        case c: Int => c
+      }
+    }
   }
 
   def bulkLoad(family: Array[Byte], bulkRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])], completeAsync: Boolean): Long = {

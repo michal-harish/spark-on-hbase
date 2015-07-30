@@ -1,11 +1,10 @@
 package org.apache.spark.hbase.examples.simple
 
+import org.apache.hadoop.hbase.HConstants._
 import org.apache.hadoop.hbase.client.Result
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.HColumnDescriptor
-import org.apache.hadoop.hbase.HConstants._
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
 
