@@ -6,7 +6,7 @@ import org.apache.hadoop.hbase.TableName
 import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SerializableWritable
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{MapPartitionsRDD, RDD}
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
@@ -15,11 +15,17 @@ import scala.reflect.ClassTag
  * Created by mharis on 27/07/15.
  *
  * Functions available for HBaseRDD via implicit conversions
+ *
+ * TODO make sure we understand what self.withScope does
  */
 
 class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt: ClassTag[V]) extends Serializable {
 
-  //TODO make sure we understand what self.withScope does
+  def mapValues[U: ClassTag](f: (V) => U): HBaseRDD[K, U] = self.withScope {
+    val cleanF = self.context.clean(f)
+    self.mapResultRDD[U]((result) => cleanF(self.resultToValue(result)))
+  }
+
   def join[W](other: RDD[(K, W)]): RDD[(K, (V, W))] = self.withScope {
     val j = if (multiGetSize == -1) new HBaseJoinRangeScan[W](self.cf: _*) else new HBaseJoinMultiGet[W](1000, self.cf: _*)
     j(self.resultToValue, other)
@@ -249,9 +255,9 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
               }
             }
             while (forward.hasNext && forward.head._2._1.isEmpty && multiGet.size < multiGetSize) {
-              val (vid, (leftSideValue, rightSideValue)) = forward.next
-              multiGet += keyToBytes(vid)
-              bufferMap(vid) = ((emptyLeftSide, rightSideValue))
+              val (key, (leftSideValue, rightSideValue)) = forward.next
+              multiGet += keyToBytes(key)
+              bufferMap(key) = ((emptyLeftSide, rightSideValue))
             }
             if (!forward.hasNext || bufferMap.size >= multiGetSize) {
               val multiGetList = new util.ArrayList[Get]()

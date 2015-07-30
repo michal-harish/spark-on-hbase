@@ -102,7 +102,7 @@ object Utils {
   }
 
   def updateSchema(sc: SparkContext, tableNameAsString: String, numRegions: Int, families: HColumnDescriptor*): Boolean = {
-    println(s"CHECKING TABLE `${tableNameAsString}` SCHEMA FOR with ${families.size} column families: " + families.map(_.getNameAsString).mkString(","))
+    println(s"CHECKING TABLE `${tableNameAsString}` WITH ${families.size} COLUMN FAMILIES: " + families.map(_.getNameAsString).mkString(","))
     val hbaseConf = initConfig(sc, HBaseConfiguration.create)
     val connection = ConnectionFactory.createConnection(hbaseConf)
     val admin = connection.getAdmin

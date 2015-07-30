@@ -5,7 +5,7 @@ import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{HBaseConfiguration, HConstants, TableName}
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{MapPartitionsRDD, RDD}
 import org.apache.spark.{Partition, SerializableWritable, SparkContext, TaskContext}
 
 import scala.reflect.ClassTag
@@ -37,6 +37,16 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
   def keyToBytes: K => Array[Byte]
 
   def resultToValue: Result => V
+
+  def mapResultRDD[V](resultMapper: (Result) => V) = {
+    new HBaseRDD[K,V](sc, tableNameAsString, minStamp, maxStamp, columns: _*) {
+      override def bytesToKey = HBaseRDD.this.bytesToKey
+
+      override def keyToBytes: (K) => Array[Byte] = HBaseRDD.this.keyToBytes
+
+      override def resultToValue = resultMapper
+    }
+  }
 
   protected def getRegionScan(region: Int): Scan = {
     val scan = new Scan()
@@ -75,8 +85,8 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
     val scan = getRegionScan(split.index)
     val scanner: ResultScanner = table.getScanner(scan)
     var current: Option[(K, V)] = None
-    val bytesToKey = this.bytesToKey
-    val resultToValue = this.resultToValue
+    //val bytesToKey = this.bytesToKey
+    //val resultToValue = this.resultToValue
 
     new Iterator[(K, V)] {
       override def hasNext: Boolean = current match {
@@ -113,6 +123,7 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
 }
 
 object HBaseRDD {
+
   implicit def hBaseRddToPairRDDFunctions[K, V](rdd: HBaseRDD[K, V])
     (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null): HBaseRDDFunctions[K, V] = {
     new HBaseRDDFunctions[K, V](rdd)
@@ -122,8 +133,8 @@ object HBaseRDD {
   = new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, minStamp, maxStamp, columns:_*) {
     override def bytesToKey = (bytes: Array[Byte]) => bytes
 
-    override def keyToBytes = (key: Array[Byte]) => key
-
     override def resultToValue = (result: Result) => result
+
+    override def keyToBytes = (key: Array[Byte]) => key
   }
 }

@@ -4,7 +4,8 @@ import org.apache.hadoop.hbase.client.Result
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{HColumnDescriptor, HConstants}
+import org.apache.hadoop.hbase.HColumnDescriptor
+import org.apache.hadoop.hbase.HConstants._
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
 
@@ -22,78 +23,54 @@ object HBaseTableSimple {
   )
 }
 
-//object HBaseStringKeyMapper extends HBaseKeyMapper[String] {
-//  override def bytesToKey = (bytes: Array[Byte]) => new String(bytes)
-//
-//  override def keyToBytes = (key: String) => key.getBytes
-//}
+class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBaseTable[String](sc, tableNameAsString) {
 
-class HBaseTableSimple(sc: SparkContext, tableNameAsString: String, cf: HColumnDescriptor*)
-  extends HBaseTable[String](sc, tableNameAsString) {
 
   override protected def keyToBytes = (key: String) => key.getBytes
 
   override protected def bytesToKey = (bytes: Array[Byte]) => new String(bytes)
 
-  @transient
-  def rddNumCells: HBaseRDD[String, Short] = {
-    val resultMapper = (row: Result) => {
-      var numCells: Int = 0
-      val scanner = row.cellScanner
-      while (scanner.advance) {
-        numCells = numCells + 1
-      }
-      numCells.toShort
+  def rddNumCells: HBaseRDD[String, Short] = rdd(OLDEST_TIMESTAMP, LATEST_TIMESTAMP).mapValues(result => {
+    var numCells: Int = 0
+    val scanner = result.cellScanner
+    while (scanner.advance) {
+      numCells = numCells + 1
     }
-    rdd[Short](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP)
-  }
+    numCells.toShort
+  })
 
-  @transient
-  def rddTags: HBaseRDD[String, List[String]] = {
-    val cfTags = Bytes.toBytes("T")
-    val resultMapper = (row: Result) => {
-      val featureMapBuilder = List.newBuilder[String]
-      val scanner = row.cellScanner
-      while (scanner.advance) {
-        val kv = scanner.current
-        if (Bytes.equals(kv.getFamilyArray, kv.getFamilyOffset, kv.getFamilyLength, cfTags, 0, cfTags.length)) {
-          val feature = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
-          featureMapBuilder += ((feature))
-        }
-      }
-      featureMapBuilder.result
+  def rddTags: HBaseRDD[String, List[String]] = rdd(OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "T").mapValues((row: Result) => {
+    val tagList = List.newBuilder[String]
+    val scanner = row.cellScanner
+    while (scanner.advance) {
+      val kv = scanner.current
+      val tag = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
+      tagList += tag
     }
-    rdd[List[String]](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "T")
-  }
+    tagList.result
+  })
 
-  @transient
-  def rddFeatures = {
-    val cfFeatures = Bytes.toBytes("F")
-    val resultMapper = (row: Result) => {
-      val featureMapBuilder = Map.newBuilder[String, Double]
-      val scanner = row.cellScanner
-      while (scanner.advance) {
-        val kv = scanner.current
-        if (Bytes.equals(kv.getFamilyArray, kv.getFamilyOffset, kv.getFamilyLength, cfFeatures, 0, cfFeatures.length)) {
-          val feature = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
-          val value = Bytes.toDouble(kv.getValueArray, kv.getValueOffset)
-          featureMapBuilder += ((feature, value))
-        }
-      }
-      featureMapBuilder.result
+
+  def rddFeatures = rdd(OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F").mapValues((row: Result) => {
+    val featureMapBuilder = Map.newBuilder[String, Double]
+    val scanner = row.cellScanner
+    while (scanner.advance) {
+      val kv = scanner.current
+      val feature = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
+      val value = Bytes.toDouble(kv.getValueArray, kv.getValueOffset)
+      featureMapBuilder += ((feature, value))
     }
-    rdd[Map[String, Double]](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "F")
-  }
+    featureMapBuilder.result
+  })
 
-  @transient
+
   def rddPropensity = {
     val cfFeatures = Bytes.toBytes("F")
     val qPropensity = Bytes.toBytes("propensity")
-    val resultMapper = (row: Result) => {
+    rdd(OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F:propensity").mapValues((row: Result) => {
       val cell = row.getColumnLatestCell(cfFeatures, qPropensity)
       Bytes.toDouble(cell.getValueArray, cell.getValueOffset)
-    }
-    rdd[Double](resultMapper, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, "F:propensity")
+    })
   }
 
 }

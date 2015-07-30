@@ -11,25 +11,24 @@ class DemoSimpleApp(sc: SparkContext) {
 
   implicit val context = sc
 
-  object table extends HBaseTableSimple(sc: SparkContext, "demo-simple")
+  Utils.updateSchema(sc, "demo-simple", numRegions = 100, HBaseTableSimple.schema:_*)
+
+  val table = new HBaseTableSimple(sc: SparkContext, "demo-simple")
 
   def help = {
     println("Spark-on-HBase Graph Demo shell help:")
     println(" help - print this usage information")
-    println(" create - create (if not exists) the underlying hbase table `demo-simple`")
-    println(" update  - update the underlying hbase table `demo-simple`")
+    println(" table - main example instance of the HBaseTableSimple `demo-simple`")
+    println(" put  - put example data into the underlying hbase table `demo-simple`")
     println(" collect - collect all data from the demo table")
     println(" collectNumCells - count number of cells per row in a specialised HBaseRDD[String, Short]")
     println(" collectFeatures - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Double]]")
     println(" collectPropensity - collect column `propensity` from family `F` as a specialised HBaseRDD[String, Double]")
     println(" collectTags - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Double]]")
+    println(" join - example join")
   }
 
-  def create = {
-    Utils.updateSchema(sc, "demo-simple", numRegions = 100, HBaseTableSimple.schema:_*)
-  }
-
-  def update = {
+  def put = {
     println("Updating `demo-simple` column family `F` - Features")
     val dataForColumnFamilyF = sc.parallelize(Array(
       "row1" -> Map(
@@ -58,23 +57,32 @@ class DemoSimpleApp(sc: SparkContext) {
   }
 
   def collect = {
-    println("Collecting all data from `demo-simple`")
+    println("Collecting all data from `demo-simple`> table.rdd.collect.foreach(println)")
     table.rdd.collect.foreach(println)
   }
 
   def collectFeatures = {
+    println("> table.rdd.collect.foreach(println)")
     table.rddFeatures.collect.foreach(println)
   }
 
   def collectPropensity = {
+    println("> table.rddFeatures.collect.foreach(println)")
     table.rddFeatures.collect.foreach(println)
   }
 
   def collectTags = {
+    println("> table.rddTags.collect.foreach(println)")
     table.rddTags.collect.foreach(println)
   }
   def collectNumCells = {
+    println("> table.rddNumCells.collect.foreach(println)")
     table.rddNumCells.collect.foreach(println)
+  }
+
+  def join = {
+    println("> table.rddTags.join(table.rddTags.mapValues(_.hashCode)).collect.foreach(println)")
+    table.rddTags.join(table.rddTags.mapValues(_.hashCode)).collect.foreach(println)
   }
 
 }
