@@ -99,6 +99,20 @@ class HKeySpaceLongPositive(symbol: String) extends HKeySpace(symbol) with KeySe
   }
 }
 
+class IdSpaceHEX(symbol: String) extends HKeySpace(symbol) with VidSerdeHEX {
+  override def asBytes(id: String): Array[Byte] = {
+    if (id.length % 2 != 0) throw new IllegalArgumentException
+    val bytes = allocate(id.length / 2)
+    hexadecimalToBytes(id, 0, id.length, bytes, 6)
+    val crc = ByteUtils.crc32(bytes, 6, bytes.length - 6)
+    ByteUtils.putIntValue(crc, bytes, 0)
+    bytes
+  }
+
+  override def asString(bytes: Array[Byte]): String = {
+    bytesToHexadecimal(bytes, 6, bytes.length - 6)
+  }
+}
 trait KeySerdeUUID {
   val uuidPattern = "^(?i)[a-f0-9]{8}\\-[a-f0-9]{4}\\-[a-f0-9]{4}\\-[a-f0-9]{4}\\-[a-f0-9]{12}$".r.pattern
 
@@ -153,6 +167,16 @@ trait KeySerdeLongPositive {
 
   def longPositiveBytesToString(bytes: Array[Byte], offset: Int): String = {
     (ByteUtils.asLongValue(bytes, offset) >>> 1).toString
+  }
+}
+
+trait VidSerdeHEX {
+  def hexadecimalToBytes(id: String, srcOffset: Int, srcLen: Int, dest: Array[Byte], destOffset: Int) = {
+    ByteUtils.parseRadix16(id.getBytes, srcOffset, srcLen, dest, destOffset)
+  }
+
+  def bytesToHexadecimal(bytes: Array[Byte], offset: Int, len: Int) = {
+    ByteUtils.toRadix16(bytes, offset, len)
   }
 }
 

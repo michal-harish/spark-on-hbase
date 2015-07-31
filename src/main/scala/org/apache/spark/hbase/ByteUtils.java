@@ -62,22 +62,23 @@ public class ByteUtils {
     }
     public static void parseRadix16(byte[] array, int offset, int len, byte[] dest, int destOffset) {
         int limit = Math.min(offset + len, array.length);
-        int j = 0;
+        int j = destOffset;
         for (int i = offset; i < limit; i+=2,j++) {
-            dest[j + destOffset] = (byte) (parseRadix16Byte(array[i]) * 16 + parseRadix16Byte(array[i+1]));
+            dest[j] = (byte) (parseRadix16Byte(array[i]) * 16 + parseRadix16Byte(array[i+1]));
         }
     }
 
     private static final String HEX = "0123456789abcdef";
     public static String toRadix16(byte[] source, int srcOffset, int len) {
-        char[] hex = new char[source.length * 2];
-        for ( int j = 0; j < source.length; j++ ) {
-            int b = source[j] & 0xFF;
+        char[] hex = new char[len * 2];
+        for ( int j = 0; j < len; j++ ) {
+            int b = source[j + srcOffset] & 0xFF;
             hex[j * 2] = HEX.charAt(b >>> 4);
             hex[j * 2 + 1] = HEX.charAt(b & 0x0F);
         }
         return new String(hex);
     }
+
 
 
     private static int parseRadix16Byte(byte b) {
