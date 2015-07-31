@@ -55,15 +55,30 @@ public class ByteUtils {
         return result;
     }
 
-    /*public static byte[] parseRadix16(byte[] array, int offset, int limit) {
-        int len = Math.min(limit, array.length - offset - 1);
-        byte[] result = new byte[len];
-        int j = 0;
-        for (int i = offset; i <= limit-1; i+=2,j++) {
-            result[j] = (byte) (parseRadix16Byte(array[i]) * 16 + parseRadix16Byte(array[i+1]));
-        }
+    public static byte[] parseRadix16(byte[] array, int offset, int len) {
+        byte[] result = new byte[len / 2];
+        parseRadix16(array, offset, len, result, 0);
         return result;
-    }*/
+    }
+    public static void parseRadix16(byte[] array, int offset, int len, byte[] dest, int destOffset) {
+        int limit = Math.min(offset + len, array.length);
+        int j = 0;
+        for (int i = offset; i < limit; i+=2,j++) {
+            dest[j + destOffset] = (byte) (parseRadix16Byte(array[i]) * 16 + parseRadix16Byte(array[i+1]));
+        }
+    }
+
+    private static final String HEX = "0123456789abcdef";
+    public static String toRadix16(byte[] source, int srcOffset, int len) {
+        char[] hex = new char[source.length * 2];
+        for ( int j = 0; j < source.length; j++ ) {
+            int b = source[j] & 0xFF;
+            hex[j * 2] = HEX.charAt(b >>> 4);
+            hex[j * 2 + 1] = HEX.charAt(b & 0x0F);
+        }
+        return new String(hex);
+    }
+
 
     private static int parseRadix16Byte(byte b) {
         if (b >= 48 && b <= 57) {
@@ -269,10 +284,10 @@ public class ByteUtils {
     }
 
     private static String UUIDToString(long mostSigBits, long leastSigBits, String separator) {
-        return (digits(mostSigBits >> 32, 8) 
-                + separator + digits(mostSigBits >> 16, 4) 
-                + separator + digits(mostSigBits, 4) 
-                + separator + digits(leastSigBits >> 48, 4) 
+        return (digits(mostSigBits >> 32, 8)
+                + separator + digits(mostSigBits >> 16, 4)
+                + separator + digits(mostSigBits, 4)
+                + separator + digits(leastSigBits >> 48, 4)
                 + separator + digits(leastSigBits, 12));
     }
 

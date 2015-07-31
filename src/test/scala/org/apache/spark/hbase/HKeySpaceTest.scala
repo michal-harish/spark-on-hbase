@@ -23,7 +23,6 @@ class HKeySpaceTest extends FlatSpec with Matchers {
     new HKeySpaceUUID("u").keyValue
   )
 
-
   behavior of "HKeySpaceLong"
   it should "have even distribution when partitioned by RegionPartitioner" in {
     val keys: Seq[HKey] = for (i <- (0 to 100000)) yield HKey("l", random.nextLong.toString)
