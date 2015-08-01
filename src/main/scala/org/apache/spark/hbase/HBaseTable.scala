@@ -48,20 +48,25 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   def bytesToKey: Array[Byte] => K
 
-  def rdd = {
-    rdd[Result]((result: Result) => result, OLDEST_TIMESTAMP, LATEST_TIMESTAMP)
+  type D = HBaseRDD[K, Result]
+
+  def rdd:D = rdd(Consistency.STRONG, OLDEST_TIMESTAMP, LATEST_TIMESTAMP)
+
+  def rdd(consistency: Consistency):D = rdd(consistency, OLDEST_TIMESTAMP, LATEST_TIMESTAMP)
+
+  def rdd(columns: String*):D = rdd(Consistency.STRONG, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
+
+  def rdd(consistency: Consistency, columns: String*):D = rdd(consistency, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
+
+  def rdd(minStamp: Long, maxStamp: Long, columns: String*):D = rdd(Consistency.STRONG, minStamp, maxStamp, columns: _*)
+
+  def rdd(consistency: Consistency, minStamp: Long, maxStamp: Long, columns: String*):D = {
+    rdd[Result]((result: Result) => result, consistency, minStamp, maxStamp, columns: _*)
   }
 
-  def rdd(columns: String*) = {
-    rdd[Result]((result: Result) => result, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
-  }
-
-  def rdd(minStamp: Long, maxStamp: Long, columns: String*) = {
-    rdd[Result]((result: Result) => result, HConstants.OLDEST_TIMESTAMP, HConstants.LATEST_TIMESTAMP, columns: _*)
-  }
-
-  private def rdd[V](valueMapper: (Result) => V, minStamp: Long, maxStamp: Long, columns: String*) = {
-    new HBaseRDD[K,V](sc, tableNameAsString, minStamp, maxStamp, null, columns: _*) {
+  private def rdd[V](valueMapper: (Result) => V,
+                     consistency: Consistency, minStamp: Long, maxStamp: Long, columns: String*): HBaseRDD[K,V] = {
+    new HBaseRDD[K,V](sc, tableNameAsString, consistency, minStamp, maxStamp, null, columns: _*) {
       override def bytesToKey = HBaseTable.this.bytesToKey
 
       override def keyToBytes = HBaseTable.this.keyToBytes

@@ -4,6 +4,7 @@ import java.io.{BufferedWriter, OutputStreamWriter}
 
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.hbase.client.Result
+import org.apache.hadoop.hbase.HConstants._
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
@@ -171,12 +172,13 @@ with AGraph[HE] {
     stream.close
   }
 
-  def rddFeatures: LAYER[FEATURES] = rdd(HKeySpace("d"), cfFeatures, HConstants.LATEST_TIMESTAMP).mapValues(CFRFeatures)
+  def rddFeatures: LAYER[FEATURES] = rdd(HKeySpace("d"), OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F").mapValues(CFRFeatures)
 
   def rddFeatures[T](feature: String)(implicit tag: ClassTag[T]): LAYER[T] = {
     val cfFeatures = this.cfFeatures
     val fFeature = Bytes.toBytes(feature)
-    val filtered = rdd(HKeySpace("d"), cfFeatures, HConstants.LATEST_TIMESTAMP).filter(_._2.containsNonEmptyColumn(cfFeatures, fFeature))
+    val filtered = rdd(HKeySpace("d"), OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F")
+      .filter(_._2.containsNonEmptyColumn(cfFeatures, fFeature))
     val t: ((Result) => T) = tag.runtimeClass match {
       case java.lang.Long.TYPE => (row: Result) => Bytes.toLong(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
       case java.lang.Double.TYPE => (row: Result) => Bytes.toDouble(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
@@ -219,9 +221,9 @@ with AGraph[HE] {
     dest.loadNet(update, closeContextOnExit)
   }
 
-  def histogram(beforeTimestamp: Long = HConstants.LATEST_TIMESTAMP): Array[(Long, Long)] = hist(rddNumEdges(beforeTimestamp))
+  def histogram(beforeTimestamp: Long = LATEST_TIMESTAMP): Array[(Long, Long)] = hist(rddNumEdges(beforeTimestamp))
 
-  def rddNumEdges(beforeTimestamp: Long = HConstants.LATEST_TIMESTAMP): LAYER[Long] = {
+  def rddNumEdges(beforeTimestamp: Long = LATEST_TIMESTAMP): LAYER[Long] = {
     val cfNet = Bytes.toBytes("N")
     val CFRNumEdges = (row: Result) => {
       val scanner = row.cellScanner
@@ -229,7 +231,7 @@ with AGraph[HE] {
       while (scanner.advance) numEdges += 1L
       numEdges
     }
-    rdd(HConstants.OLDEST_TIMESTAMP, beforeTimestamp, "N").mapValues(CFRNumEdges)
+    rdd(OLDEST_TIMESTAMP, beforeTimestamp, "N").mapValues(CFRNumEdges)
   }
 
   /**
@@ -249,7 +251,7 @@ with AGraph[HE] {
   /**
    * rddPool Returns a POOL of all Row keys in the given key space and their maximum connected Row in the same key space
    */
-  def rddPool(keySpace: String, beforeTimestamp: Long = HConstants.LATEST_TIMESTAMP): POOL = {
+  def rddPool(keySpace: String, beforeTimestamp: Long = LATEST_TIMESTAMP): POOL = {
     val cfNet = this.cfNet
     val keySpaceCode = HKeySpace(keySpace)
     val CFRMaxKey1Space = (row: Result) => {
@@ -263,16 +265,16 @@ with AGraph[HE] {
       }
       HKey(if (selectedCell == null) row.getRow else CellUtil.cloneQualifier(selectedCell))
     }
-    rdd(keySpaceCode, cfNet, beforeTimestamp).mapValues(CFRMaxKey1Space)
+    rdd(keySpaceCode, OLDEST_TIMESTAMP, beforeTimestamp, "N").mapValues(CFRMaxKey1Space)
   }
 
   /**
    * rddNet is the RDD representation of the underlying hbase state of the N (NETWORK) column family
    * it includes the singletons which will have an empty Seq() in the value
    */
-  def rddNet: NETWORK = rddNet("*", HConstants.LATEST_TIMESTAMP)
+  def rddNet: NETWORK = rddNet("*", OLDEST_TIMESTAMP, LATEST_TIMESTAMP)
 
-  def rddNet(keySpace: String, beforeTimestamp: Long = HConstants.LATEST_TIMESTAMP): NETWORK = {
+  def rddNet(keySpace: String, minStamp:Long = OLDEST_TIMESTAMP, maxStamp: Long = LATEST_TIMESTAMP): NETWORK = {
     val cfNet = this.cfNet
     val keySpaceCode = HKeySpace(keySpace)
     val allSpaces = keySpace == "*"
@@ -289,7 +291,11 @@ with AGraph[HE] {
       }
       edgeSeqBuilder.result
     }
-    (if (allSpaces) rdd(HConstants.OLDEST_TIMESTAMP, beforeTimestamp, "N") else rdd(keySpaceCode, cfNet, beforeTimestamp))
+    (if (allSpaces) {
+      rdd(OLDEST_TIMESTAMP, maxStamp, "N")
+    } else {
+      rdd(keySpaceCode, OLDEST_TIMESTAMP, maxStamp, "N")
+    })
       .mapValues(CFREdge1S)
   }
 

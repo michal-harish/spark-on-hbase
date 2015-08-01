@@ -1,8 +1,7 @@
 package org.apache.spark.hbase.keyspace
 
-import org.apache.hadoop.hbase._
+import org.apache.hadoop.hbase.HConstants._
 import org.apache.hadoop.hbase.client._
-import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.HBaseTable
 import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
@@ -21,14 +20,19 @@ class HBaseTableHKey(sc: SparkContext, tableNameAsString: String)(implicit reg: 
 
   override def bytesToKey: Array[Byte] => HKey = (bytes: Array[Byte]) => HKey(bytes)
 
-  @transient
   def rdd(rowKeySpace: Short, columns: String*): RDD[(HKey, Result)] = {
-    new HBaseRDDHKey(sc, tableNameAsString, rowKeySpace, columns: _*)
+    rdd(Consistency.STRONG, rowKeySpace, columns: _*)
   }
 
-  @transient
-  def rdd(rowKeySpace: Short, cf: Array[Byte], maxStamp: Long): RDD[(HKey, Result)] = {
-    new HBaseRDDHKey(sc, tableNameAsString, rowKeySpace, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf))
+  def rdd(rowKeySpace: Short, minStamp:Long, maxStamp: Long, columns: String*): HBaseRDDHKey = {
+    rdd(Consistency.STRONG, rowKeySpace, minStamp, maxStamp, columns: _*)
+  }
+  def rdd(consistency: Consistency, rowKeySpace: Short, columns: String*): HBaseRDDHKey = {
+    rdd(consistency, rowKeySpace, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
+  }
+
+  def rdd(consistency: Consistency, rowKeySpace: Short, minStamp:Long, maxStamp: Long, columns: String*): HBaseRDDHKey = {
+    new HBaseRDDHKey(sc, tableNameAsString, Consistency.STRONG, rowKeySpace, OLDEST_TIMESTAMP, maxStamp, columns:_*)
   }
 
 }

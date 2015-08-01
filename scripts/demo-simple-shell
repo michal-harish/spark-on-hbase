@@ -32,8 +32,8 @@ $SPARK_HOME/bin/spark-shell \
     --conf "spark.hadoop.validateOutputSpecs=false" \
     --conf "spark.scheduler.minRegisteredResourcesRatio=1.0" \
     --conf "spark.scheduler.maxRegisteredResourcesWaitingTime=30000" \
-    --conf "spark.executor.extraClassPath=/usr/lib/hbase/*:/usr/lib/hbase/lib/htrace-core-3.1.0-incubating.jar:/usr/lib/hbase/lib/guava-12.0.1.jar" \
-    --conf "spark.executor.extraLibraryPath=/usr/lib/hadoop/lib/native" \
+    --conf "spark.executor.extraClassPath=$HBASE_HOME/*:$HBASE_HOME/lib/htrace-core-3.1.0-incubating.jar:$HBASE_HOME/lib/guava-12.0.1.jar" \
+    --conf "spark.executor.extraLibraryPath=$HADOOP_HOME/lib/native" \
     --conf "spark.executorEnv.LD_PRELOAD=/opt/jprofiler/librebind.so" \
     --conf "spark.executorEnv.REBIND_PORT=8849:0" \
     --conf "spark.executor.extraJavaOptions=-verbose:gc -XX:+UseSerialGC -XX:+UseCompressedOops -XX:+UseCompressedStrings $EXTRAS" \
@@ -42,8 +42,8 @@ $SPARK_HOME/bin/spark-shell \
     --conf "spark.executor.userClassPathFirst=true" \
     --conf "spark.executorEnv.HBASE_CONF_DIR=$HBASE_CONF_DIR" \
     --conf "spark.executorEnv.HADOOP_CONF_DIR=$HADOOP_CONF_DIR" \
-    --driver-class-path "/usr/lib/hbase/*:/usr/lib/hbase/lib/htrace-core-3.1.0-incubating.jar:/usr/lib/hbase/lib/guava-12.0.1.jar" \
-    --driver-library-path "/usr/lib/hadoop/lib/native" \
+    --driver-class-path "$HBASE_HOME/*:$HBASE_HOME/lib/htrace-core-3.1.0-incubating.jar:$HBASE_HOME/lib/guava-12.0.1.jar" \
+    --driver-library-path "$HADOOP_HOME/lib/native" \
     -i "$SCRIPTS/demo-simple-init.scala" \
     --jars "$TARGET/spark-hbase-demo-simple.jar"
 

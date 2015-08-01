@@ -27,21 +27,26 @@ import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
  */
 class HBaseRDDHKey(@transient private val sc: SparkContext
                , tableNameAsString: String
+               , consistency: Consistency
                , keySpace: Short
                , minStamp: Long
                , maxStamp: Long
                , columns: String*
-                )(implicit reg: HKSREG) extends HBaseRDD[HKey, Result](
-  sc, tableNameAsString, minStamp, maxStamp, (HKeySpace(keySpace).allocate(0), Array[Byte](1, 1, 1, 1, 0, 0)), columns:_*) {
+                )(implicit reg: HKSREG)
+  extends HBaseRDD[HKey, Result](sc, tableNameAsString, consistency,
+    minStamp, maxStamp, (HKeySpace(keySpace).allocate(0), Array[Byte](1, 1, 1, 1, 0, 0)), columns:_*) {
 
   def this(sc: SparkContext, tableNameAsString: String, columns: String*)(implicit reg: HKSREG)
-  = this(sc, tableNameAsString, -1.toShort, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
+  = this(sc, tableNameAsString, Consistency.STRONG, -1.toShort, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
+
+  def this(sc: SparkContext, tableNameAsString: String, consistency: Consistency, columns: String*)(implicit reg: HKSREG)
+  = this(sc, tableNameAsString, consistency, -1.toShort, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
 
   def this(sc: SparkContext, tableNameAsString: String, minStamp: Long, maxStamp: Long, columns: String*)(implicit reg: HKSREG)
-  = this(sc, tableNameAsString, -1.toShort, minStamp, maxStamp, columns: _*)
+  = this(sc, tableNameAsString, Consistency.STRONG, -1.toShort, minStamp, maxStamp, columns: _*)
 
   def this(sc: SparkContext, tableNameAsString: String, keySpace: Short, columns: String*)(implicit reg: HKSREG)
-  = this(sc, tableNameAsString, keySpace, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
+  = this(sc, tableNameAsString, Consistency.STRONG, keySpace, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
 
   override def bytesToKey = (rowKey: Array[Byte]) => HKey(rowKey)
 

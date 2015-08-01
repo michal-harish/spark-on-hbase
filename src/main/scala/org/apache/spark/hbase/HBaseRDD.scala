@@ -18,6 +18,7 @@ import scala.reflect.ClassTag
 
 abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
                               , val tableNameAsString: String
+                              , val consistency: Consistency
                               , val minStamp: Long
                               , val maxStamp: Long
                               , val fuzzyFilter: (Array[Byte], Array[Byte])
@@ -42,7 +43,7 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
   def resultToValue: Result => V
 
   def mapResultRDD[V](resultMapper: (Result) => V) = {
-    new HBaseRDD[K,V](sc, tableNameAsString, minStamp, maxStamp, null, columns: _*) {
+    new HBaseRDD[K,V](sc, tableNameAsString, consistency, minStamp, maxStamp, null, columns: _*) {
       override def bytesToKey = HBaseRDD.this.bytesToKey
 
       override def keyToBytes: (K) => Array[Byte] = HBaseRDD.this.keyToBytes
@@ -134,8 +135,13 @@ object HBaseRDD {
     new HBaseRDDFunctions[K, V](rdd)
   }
 
-  def create(sc: SparkContext, tableNameAsString: String, minStamp: Long, maxStamp: Long, columns: String*)
-  = new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, minStamp, maxStamp, null, columns:_*) {
+  def create(sc: SparkContext,
+             tableNameAsString: String,
+             consistency: Consistency,
+             minStamp: Long,
+             maxStamp: Long,
+             columns: String*)
+  = new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, consistency, minStamp, maxStamp, null, columns:_*) {
     override def bytesToKey = (bytes: Array[Byte]) => bytes
 
     override def resultToValue = (result: Result) => result
