@@ -5,13 +5,13 @@ import java.io.ByteArrayOutputStream
 import com.esotericsoftware.kryo.io.Input
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
-import org.apache.hadoop.hbase.client.ConnectionFactory
+import org.apache.hadoop.hbase.client.{Durability, Put, ConnectionFactory}
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{HTableDescriptor, HBaseConfiguration, HColumnDescriptor, TableName}
 import org.apache.hadoop.io.{BytesWritable, NullWritable}
-import org.apache.spark.SparkContext
+import org.apache.spark.{SerializableWritable, SparkContext}
 import org.apache.spark.hbase.keyspace.HKey
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
@@ -141,6 +141,39 @@ object Utils {
     }
   }
 
+
+  def copy(sc: SparkContext, src: HBaseTable, dest: HBaseTable) {
+    val broadCastConf = new SerializableWritable(Utils.initConfig(sc, HBaseConfiguration.create))
+    val srcTableNameAsString = src.tableNameAsString
+    val destTableNameAsString = dest.tableNameAsString
+    val updateCount = sc.accumulator(0L, "HBaseTable copy utility counter")
+    println(s"HBATable COPYING ${srcTableNameAsString} TO ${destTableNameAsString}")
+    val srcTransformed = src.rdd().partitionBy(new RegionPartitioner(dest.numberOfRegions))
+    srcTransformed.foreachPartition(part => {
+      val connection = ConnectionFactory.createConnection(broadCastConf.value)
+      val destTable = connection.getBufferedMutator(TableName.valueOf(destTableNameAsString))
+      try {
+        var partCount = 0L
+        part.foreach {
+          case (key, result) => {
+            val scanner = result.cellScanner()
+            val put = new Put(src.keyToBytes(key))
+            put.setDurability(Durability.SKIP_WAL)
+            while (scanner.advance) {
+              val cell = scanner.current
+              put.add(cell)
+            }
+            partCount += 1
+            destTable.mutate(put)
+          }
+        }
+        updateCount += partCount
+      } finally {
+        destTable.close
+      }
+    })
+  }
+
   def dropIfExists(sc: SparkContext, tableNameAsString: String) {
     val hbaseConf = initConfig(sc, HBaseConfiguration.create)
     val connection = ConnectionFactory.createConnection(hbaseConf)
@@ -236,5 +269,6 @@ object Utils {
       kryo.readObject(input, classOf[Array[(HKey, T)]])
     })
   }
+
 
 }
