@@ -25,9 +25,9 @@ object HBaseTableSimple {
 class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBaseTable[String](sc, tableNameAsString) {
 
 
-  override protected def keyToBytes = (key: String) => key.getBytes
+  override def keyToBytes = (key: String) => key.getBytes
 
-  override protected def bytesToKey = (bytes: Array[Byte]) => new String(bytes)
+  override def bytesToKey = (bytes: Array[Byte]) => new String(bytes)
 
   def rddNumCells: HBaseRDD[String, Short] = rdd(OLDEST_TIMESTAMP, LATEST_TIMESTAMP).mapValues(result => {
     var numCells: Int = 0

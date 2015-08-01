@@ -44,9 +44,9 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   @transient val partitioner = new RegionPartitioner(numberOfRegions)
 
-  protected def keyToBytes: K => Array[Byte]
+  def keyToBytes: K => Array[Byte]
 
-  protected def bytesToKey: Array[Byte] => K
+  def bytesToKey: Array[Byte] => K
 
   def rdd = {
     rdd[Result]((result: Result) => result, OLDEST_TIMESTAMP, LATEST_TIMESTAMP)
@@ -61,7 +61,7 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
   }
 
   private def rdd[V](valueMapper: (Result) => V, minStamp: Long, maxStamp: Long, columns: String*) = {
-    new HBaseRDD[K,V](sc, tableNameAsString, minStamp, maxStamp, columns: _*) {
+    new HBaseRDD[K,V](sc, tableNameAsString, minStamp, maxStamp, null, columns: _*) {
       override def bytesToKey = HBaseTable.this.bytesToKey
 
       override def keyToBytes = HBaseTable.this.keyToBytes

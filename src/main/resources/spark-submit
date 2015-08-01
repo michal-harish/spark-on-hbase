@@ -7,7 +7,7 @@ key="$1"
 source "$DIR/options"
 
 $SPARK_HOME/bin/spark-submit \
-    --master yarn-client \
+    --master yarn-cluster \
     --driver-memory $DRIVER \
     --num-executors $WORKERS \
     --executor-memory $MEMORY \

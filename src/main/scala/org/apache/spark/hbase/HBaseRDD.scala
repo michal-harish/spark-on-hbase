@@ -5,7 +5,9 @@ import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{HBaseConfiguration, HConstants, TableName}
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.rdd.{MapPartitionsRDD, RDD}
+import org.apache.spark.rdd.RDD
+import scala.collection.JavaConverters._
+import org.apache.hadoop.hbase.filter.{FuzzyRowFilter, Filter}
 import org.apache.spark.{Partition, SerializableWritable, SparkContext, TaskContext}
 
 import scala.reflect.ClassTag
@@ -18,6 +20,7 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
                               , val tableNameAsString: String
                               , val minStamp: Long
                               , val maxStamp: Long
+                              , val fuzzyFilter: (Array[Byte], Array[Byte])
                               , val columns: String*) extends RDD[(K, V)](sc, Nil) {
 
   @transient private val tableName = TableName.valueOf(tableNameAsString)
@@ -39,34 +42,13 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
   def resultToValue: Result => V
 
   def mapResultRDD[V](resultMapper: (Result) => V) = {
-    new HBaseRDD[K,V](sc, tableNameAsString, minStamp, maxStamp, columns: _*) {
+    new HBaseRDD[K,V](sc, tableNameAsString, minStamp, maxStamp, null, columns: _*) {
       override def bytesToKey = HBaseRDD.this.bytesToKey
 
       override def keyToBytes: (K) => Array[Byte] = HBaseRDD.this.keyToBytes
 
       override def resultToValue = resultMapper
     }
-  }
-
-  protected def getRegionScan(region: Int): Scan = {
-    val scan = new Scan()
-    scan.setMaxVersions(1)
-    scan.setConsistency(Consistency.STRONG)
-    if (columns.size > 0) {
-      columns.foreach(_ match {
-        case cf: String if (!cf.contains(':')) => scan.addFamily(Bytes.toBytes(cf))
-        case column: String => column.split(":") match {
-          case Array(cf, qualifier) => scan.addColumn(Bytes.toBytes(cf), Bytes.toBytes(qualifier))
-        }
-      })
-    }
-    val (startKey, stopKey) = regionSplits(region)
-    if (startKey.size > 0) scan.setStartRow(startKey)
-    if (stopKey.size > 0) scan.setStopRow(stopKey)
-    if (minStamp != HConstants.OLDEST_TIMESTAMP || maxStamp != HConstants.LATEST_TIMESTAMP) {
-      scan.setTimeRange(minStamp, maxStamp)
-    }
-    scan
   }
 
   final override protected def getPartitions: Array[Partition] = {
@@ -85,8 +67,6 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
     val scan = getRegionScan(split.index)
     val scanner: ResultScanner = table.getScanner(scan)
     var current: Option[(K, V)] = None
-    //val bytesToKey = this.bytesToKey
-    //val resultToValue = this.resultToValue
 
     new Iterator[(K, V)] {
       override def hasNext: Boolean = current match {
@@ -120,6 +100,31 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
       }
     }
   }
+
+  private def getRegionScan(region: Int): Scan = {
+    val scan = new Scan()
+    scan.setMaxVersions(1)
+    scan.setConsistency(Consistency.STRONG)
+    if (columns.size > 0) {
+      columns.foreach(_ match {
+        case cf: String if (!cf.contains(':')) => scan.addFamily(Bytes.toBytes(cf))
+        case column: String => column.split(":") match {
+          case Array(cf, qualifier) => scan.addColumn(Bytes.toBytes(cf), Bytes.toBytes(qualifier))
+        }
+      })
+    }
+    val (startKey, stopKey) = regionSplits(region)
+    if (startKey.size > 0) scan.setStartRow(startKey)
+    if (stopKey.size > 0) scan.setStopRow(stopKey)
+    if (minStamp != HConstants.OLDEST_TIMESTAMP || maxStamp != HConstants.LATEST_TIMESTAMP) {
+      scan.setTimeRange(minStamp, maxStamp)
+    }
+    if (fuzzyFilter != null) {
+      scan.setFilter(new FuzzyRowFilter(List(new org.apache.hadoop.hbase.util.Pair(fuzzyFilter._1, fuzzyFilter._2)).asJava))
+    }
+    scan
+  }
+
 }
 
 object HBaseRDD {
@@ -130,7 +135,7 @@ object HBaseRDD {
   }
 
   def create(sc: SparkContext, tableNameAsString: String, minStamp: Long, maxStamp: Long, columns: String*)
-  = new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, minStamp, maxStamp, columns:_*) {
+  = new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, minStamp, maxStamp, null, columns:_*) {
     override def bytesToKey = (bytes: Array[Byte]) => bytes
 
     override def resultToValue = (result: Result) => result

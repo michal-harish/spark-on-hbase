@@ -1,15 +1,12 @@
 package org.apache.spark.hbase.keyspace
 
 import org.apache.hadoop.hbase.client._
-import org.apache.hadoop.hbase.filter._
-import org.apache.hadoop.hbase.util.Pair
-import org.apache.hadoop.hbase.TableName
 import org.apache.hadoop.hbase.HConstants._
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.HBaseRDD
 import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
 
-import scala.collection.JavaConverters._
+
 
 /**
  * Created by mharis on 10/07/15.
@@ -30,11 +27,12 @@ import scala.collection.JavaConverters._
  */
 class HBaseRDDHKey(@transient private val sc: SparkContext
                , tableNameAsString: String
-               , idSpace: Short
+               , keySpace: Short
                , minStamp: Long
                , maxStamp: Long
                , columns: String*
-                )(implicit reg: HKSREG) extends HBaseRDD[HKey, Result](sc, tableNameAsString, minStamp, maxStamp) {
+                )(implicit reg: HKSREG) extends HBaseRDD[HKey, Result](
+  sc, tableNameAsString, minStamp, maxStamp, (HKeySpace(keySpace).allocate(0), Array[Byte](1, 1, 1, 1, 0, 0)), columns:_*) {
 
   def this(sc: SparkContext, tableNameAsString: String, columns: String*)(implicit reg: HKSREG)
   = this(sc, tableNameAsString, -1.toShort, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
@@ -42,23 +40,13 @@ class HBaseRDDHKey(@transient private val sc: SparkContext
   def this(sc: SparkContext, tableNameAsString: String, minStamp: Long, maxStamp: Long, columns: String*)(implicit reg: HKSREG)
   = this(sc, tableNameAsString, -1.toShort, minStamp, maxStamp, columns: _*)
 
-  def this(sc: SparkContext, tableNameAsString: String, idSpace: Short, columns: String*)(implicit reg: HKSREG)
-  = this(sc, tableNameAsString, idSpace, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
+  def this(sc: SparkContext, tableNameAsString: String, keySpace: Short, columns: String*)(implicit reg: HKSREG)
+  = this(sc, tableNameAsString, keySpace, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
 
   override def bytesToKey = (rowKey: Array[Byte]) => HKey(rowKey)
 
   override def keyToBytes = (key: HKey) => key.bytes
 
   override def resultToValue = (row: Result) => row
-
-  override protected def getRegionScan(region: Int): Scan = {
-    val scan = super.getRegionScan(region)
-    if (idSpace != -1) {
-      scan.setFilter(new FuzzyRowFilter(
-        List(new Pair(HKeySpace(idSpace).allocate(0), Array[Byte](1, 1, 1, 1, 0, 0))).asJava
-      ))
-    }
-    scan
-  }
 
 }

@@ -26,7 +26,6 @@ class HKeyTest extends FlatSpec with Matchers {
   d1.toString should be("CESE9999:d")
   d1.asString should be("CESE9999")
 
-  //UUID Vids
   val v0 = HKey("v", "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
   v0.bytes.mkString(",") should be("-8,29,79,-82,0,118,-8,29,79,-82,125,-20,17,-48,-89,101,0,-96,-55,30,107,-10")
   v0.toString should be("f81d4fae-7dec-11d0-a765-00a0c91e6bf6:v")

@@ -17,18 +17,18 @@ import org.apache.spark.rdd.RDD
 class HBaseTableHKey(sc: SparkContext, tableNameAsString: String)(implicit reg: HKSREG)
   extends HBaseTable[HKey](sc, tableNameAsString) {
 
-  override protected def keyToBytes: HKey => Array[Byte] = (key: HKey) => key.bytes
+  override def keyToBytes: HKey => Array[Byte] = (key: HKey) => key.bytes
 
-  override protected def bytesToKey: Array[Byte] => HKey = (bytes: Array[Byte]) => HKey(bytes)
+  override def bytesToKey: Array[Byte] => HKey = (bytes: Array[Byte]) => HKey(bytes)
 
   @transient
-  def rdd(keyIdSpace: Short, columns: String*): RDD[(HKey, Result)] = {
-    new HBaseRDDHKey(sc, tableNameAsString, keyIdSpace, columns: _*)
+  def rdd(rowKeySpace: Short, columns: String*): RDD[(HKey, Result)] = {
+    new HBaseRDDHKey(sc, tableNameAsString, rowKeySpace, columns: _*)
   }
 
   @transient
-  def rdd(keyIdSpace: Short, cf: Array[Byte], maxStamp: Long): RDD[(HKey, Result)] = {
-    new HBaseRDDHKey(sc, tableNameAsString, keyIdSpace, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf))
+  def rdd(rowKeySpace: Short, cf: Array[Byte], maxStamp: Long): RDD[(HKey, Result)] = {
+    new HBaseRDDHKey(sc, tableNameAsString, rowKeySpace, HConstants.OLDEST_TIMESTAMP, maxStamp, Bytes.toString(cf))
   }
 
 }

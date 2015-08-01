@@ -22,7 +22,24 @@ import scala.reflect.ClassTag
  *
  * HE - HGraphEdge - is a lightweight object that holds the properties of each edge in the HGraph
  */
-object HE extends java.io.Serializable {
+class HE(val bytes: Array[Byte], val vendorCode: Short, val ts: Long) extends Serializable with Props[HE] {
+
+  override def combine(other: HE): HE = HE.applyVersion(ByteUtils.max(bytes, other.bytes), Math.max(other.ts, ts))
+
+  def hbaseValue: (Array[Byte], Long) = (bytes, ts)
+
+  def vendorUnknown: Boolean = vendorCode == HE.VENDOR_CODE_UNKNOWN
+
+  def probability: Double = (bytes(1) & 0xFF).toDouble / 255.0
+
+  override def toString: String = s"P=${probability}@${HE.vendors(vendorCode)}/${ts}"
+
+  override def hashCode = ByteUtils.asIntValue(bytes)
+
+  override def equals(other: Any) = other != null && other.isInstanceOf[HE] && ByteUtils.equals(bytes, other.asInstanceOf[HE].bytes)
+}
+
+object HE extends Serializable {
   val CURRENT_VERSION = 1.toByte
   val VENDOR_CODE_UNKNOWN = 0.toShort
   val vendors = Map[Short, String](
@@ -76,25 +93,9 @@ object HE extends java.io.Serializable {
 
 }
 
-class HE(val bytes: Array[Byte], val vendorCode: Short, val ts: Long) extends java.io.Serializable with Props[HE] {
 
-  override def combine(other: HE): HE = HE.applyVersion(ByteUtils.max(bytes, other.bytes), Math.max(other.ts, ts))
-
-  def hbaseValue: (Array[Byte], Long) = (bytes, ts)
-
-  def vendorUnknown: Boolean = vendorCode == HE.VENDOR_CODE_UNKNOWN
-
-  def probability: Double = (bytes(1) & 0xFF).toDouble / 255.0
-
-  override def toString: String = s"P=${probability}@${HE.vendors(vendorCode)}/${ts}"
-
-  override def hashCode = ByteUtils.asIntValue(bytes)
-
-  override def equals(other: Any) = other != null && other.isInstanceOf[HE] && ByteUtils.equals(bytes, other.asInstanceOf[HE].bytes)
-}
-
-
-class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: HKSREG) extends HBaseTableHKey(sc, tableName: String) with AGraph[HE] {
+class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: HKSREG) extends HBaseTableHKey(sc, tableName: String)
+with AGraph[HE] {
 
   @transient
   val schema = List(
@@ -135,9 +136,9 @@ class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: HKSREG) ext
     while (scanner.advance) {
       val kv = scanner.current
       if (Bytes.equals(kv.getFamilyArray, kv.getFamilyOffset, kv.getFamilyLength, cfNet, 0, cfNet.length)) {
-        val vid = HKey(CellUtil.cloneQualifier(kv))
+        val key = HKey(CellUtil.cloneQualifier(kv))
         val ts = kv.getTimestamp
-        edgeSeqBuilder += ((vid, HE.applyVersion(CellUtil.cloneValue(kv), ts)))
+        edgeSeqBuilder += ((key, HE.applyVersion(CellUtil.cloneValue(kv), ts)))
       }
     }
     edgeSeqBuilder.result
@@ -246,23 +247,23 @@ class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: HKSREG) ext
   }
 
   /**
-   * rddPool Returns a POOL of all Vids in the given IdSpace and their maximum connected Vid in the same IdSpaceskype
+   * rddPool Returns a POOL of all Row keys in the given key space and their maximum connected Row in the same key space
    */
-  def rddPool(idSpace: String, beforeTimestamp: Long = HConstants.LATEST_TIMESTAMP): POOL = {
+  def rddPool(keySpace: String, beforeTimestamp: Long = HConstants.LATEST_TIMESTAMP): POOL = {
     val cfNet = this.cfNet
-    val sIdSpace = HKeySpace(idSpace)
-    val CFRMaxVid1S = (row: Result) => {
+    val keySpaceCode = HKeySpace(keySpace)
+    val CFRMaxKey1Space = (row: Result) => {
       val scanner = row.cellScanner
       var selectedCell: Cell = null
       while (scanner.advance) {
         val kv = scanner.current
-        if (HKeySpace(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength) == sIdSpace) {
+        if (HKeySpace(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength) == keySpaceCode) {
           selectedCell = kv
         }
       }
       HKey(if (selectedCell == null) row.getRow else CellUtil.cloneQualifier(selectedCell))
     }
-    rdd(sIdSpace, cfNet, beforeTimestamp).mapValues(CFRMaxVid1S)
+    rdd(keySpaceCode, cfNet, beforeTimestamp).mapValues(CFRMaxKey1Space)
   }
 
   /**
@@ -271,24 +272,24 @@ class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: HKSREG) ext
    */
   def rddNet: NETWORK = rddNet("*", HConstants.LATEST_TIMESTAMP)
 
-  def rddNet(idSpace: String, beforeTimestamp: Long = HConstants.LATEST_TIMESTAMP): NETWORK = {
+  def rddNet(keySpace: String, beforeTimestamp: Long = HConstants.LATEST_TIMESTAMP): NETWORK = {
     val cfNet = this.cfNet
-    val sIdSpace = HKeySpace(idSpace)
-    val allSpaces = idSpace == "*"
+    val keySpaceCode = HKeySpace(keySpace)
+    val allSpaces = keySpace == "*"
     val CFREdge1S = (row: Result) => {
       val edgeSeqBuilder = Seq.newBuilder[(HKey, HE)]
       val scanner = row.cellScanner
       while (scanner.advance) {
         val kv = scanner.current
-        if (allSpaces || HKeySpace(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength) == sIdSpace) {
-          val vid = HKey(CellUtil.cloneQualifier(kv))
+        if (allSpaces || HKeySpace(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength) == keySpaceCode) {
+          val key = HKey(CellUtil.cloneQualifier(kv))
           val ts = kv.getTimestamp
-          edgeSeqBuilder += ((vid, HE.applyVersion(CellUtil.cloneValue(kv), ts)))
+          edgeSeqBuilder += ((key, HE.applyVersion(CellUtil.cloneValue(kv), ts)))
         }
       }
       edgeSeqBuilder.result
     }
-    (if (allSpaces) rdd(HConstants.OLDEST_TIMESTAMP, beforeTimestamp, "N") else rdd(sIdSpace, cfNet, beforeTimestamp))
+    (if (allSpaces) rdd(HConstants.OLDEST_TIMESTAMP, beforeTimestamp, "N") else rdd(keySpaceCode, cfNet, beforeTimestamp))
       .mapValues(CFREdge1S)
   }
 
@@ -315,10 +316,10 @@ class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: HKSREG) ext
 //  }
 
   def loadPairs(update: PAIRS, completeAsync: Boolean = true): Long = {
-    super.bulkLoad(cfNet, reverse(update).mapValues{ case (vid, he) => Map(vid.bytes -> he.hbaseValue)}, completeAsync)
+    super.bulkLoad(cfNet, reverse(update).mapValues{ case (key, he) => Map(key.bytes -> he.hbaseValue)}, completeAsync)
   }
 
-  def updateNetRdd(update: NETWORK) = update.mapValues(_.map { case (vid, he) => (vid.bytes, he.hbaseValue) }.toMap)
+  def updateNetRdd(update: NETWORK) = update.mapValues(_.map { case (key, he) => (key.bytes, he.hbaseValue) }.toMap)
 
   def updateNet(rdd: NETWORK): Long = super.update(cfNet, updateNetRdd(rdd))
 

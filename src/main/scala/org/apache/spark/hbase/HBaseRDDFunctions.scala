@@ -6,7 +6,8 @@ import org.apache.hadoop.hbase.TableName
 import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SerializableWritable
-import org.apache.spark.rdd.{MapPartitionsRDD, RDD}
+import org.apache.spark.rdd.RDD
+import org.apache.hadoop.hbase.filter.Filter
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
@@ -20,6 +21,10 @@ import scala.reflect.ClassTag
  */
 
 class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt: ClassTag[V]) extends Serializable {
+
+//  def filter(f: Filter): HBaseRDD[K, V] = self.withScope {
+//
+//  }
 
   def mapValues[U: ClassTag](f: (V) => U): HBaseRDD[K, U] = self.withScope {
     val cleanF = self.context.clean(f)
@@ -114,9 +119,9 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
               val multiGetList = mutable.MutableList[Array[Byte]]()
               val bufferMap = scala.collection.mutable.Map[K, (V, W)]()
               while (multiGetList.size < multiGetSize && part.hasNext) {
-                val (vid, rightSideValue) = part.next
-                multiGetList += keyToBytes(vid)
-                bufferMap(vid) = ((null.asInstanceOf[V], rightSideValue))
+                val (key, rightSideValue) = part.next
+                multiGetList += keyToBytes(key)
+                bufferMap(key) = ((null.asInstanceOf[V], rightSideValue))
               }
               if (!multiGetList.isEmpty) {
                 multiget(table, multiGetList, cf).foreach(row => {
@@ -162,7 +167,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
 
           private def nextLeftRow {
             val headRowKey = keyToBytes(forward.head._1)
-            //open new scan each time the difference between last and next vid is too big
+            //open new scan each time the difference between last and next row key is too big
             if (scanner == null || (1000 < ByteUtils.asIntValue(headRowKey) - ByteUtils.asIntValue(leftRow.getRow))) {
               if (scanner != null) scanner.close
               scan.setStartRow(headRowKey)

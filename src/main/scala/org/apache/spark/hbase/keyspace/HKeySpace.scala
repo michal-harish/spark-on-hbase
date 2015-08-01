@@ -12,14 +12,14 @@ object HKeySpace extends Serializable {
     (((id(offset + 4) & 0xff) << 8) + (id(offset + 5) & 0xff)).toShort
   }
 
-  def apply(idSpace: String): Short = idSpace.hashCode.toShort
+  def apply(keySpace: String): Short = keySpace.hashCode.toShort
 
-  def apply(idSpace: Short)(implicit reg: HKSREG): HKeySpace = {
-    if (exists(idSpace)) reg(idSpace) else throw new IllegalArgumentException
+  def apply(keySpace: Short)(implicit reg: HKSREG): HKeySpace = {
+    if (exists(keySpace)) reg(keySpace) else throw new IllegalArgumentException
   }
 
-  def exists(idSpace: Short)(implicit reg: HKSREG): Boolean = {
-    reg.contains(idSpace)
+  def exists(keySpace: Short)(implicit reg: HKSREG): Boolean = {
+    reg.contains(keySpace)
   }
 
 }
@@ -99,7 +99,7 @@ class HKeySpaceLongPositive(symbol: String) extends HKeySpace(symbol) with KeySe
   }
 }
 
-class IdSpaceHEX(symbol: String) extends HKeySpace(symbol) with VidSerdeHEX {
+class HKeySpaceHEX(symbol: String) extends HKeySpace(symbol) with KeySerdeHEX {
   override def asBytes(id: String): Array[Byte] = {
     if (id.length % 2 != 0) throw new IllegalArgumentException
     val bytes = allocate(id.length / 2)
@@ -170,7 +170,7 @@ trait KeySerdeLongPositive {
   }
 }
 
-trait VidSerdeHEX {
+trait KeySerdeHEX {
   def hexadecimalToBytes(id: String, srcOffset: Int, srcLen: Int, dest: Array[Byte], destOffset: Int) = {
     ByteUtils.parseRadix16(id.getBytes, srcOffset, srcLen, dest, destOffset)
   }
@@ -181,7 +181,7 @@ trait VidSerdeHEX {
 }
 
 
-//TODO trait VidSerdeInt
-//TODO trait VidSerdeDouble
-//TODO trait VidSerdeIPV4
+//TODO trait KeySerdeInt
+//TODO trait KeySerdeDouble
+//TODO trait KeySerdeIPV4
 

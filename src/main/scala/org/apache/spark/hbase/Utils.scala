@@ -142,13 +142,13 @@ object Utils {
   }
 
 
-  def copy(sc: SparkContext, src: HBaseTable, dest: HBaseTable) {
+  def copy[K: ClassTag](sc: SparkContext, src: HBaseTable[K], dest: HBaseTable[K]) {
     val broadCastConf = new SerializableWritable(Utils.initConfig(sc, HBaseConfiguration.create))
     val srcTableNameAsString = src.tableNameAsString
     val destTableNameAsString = dest.tableNameAsString
     val updateCount = sc.accumulator(0L, "HBaseTable copy utility counter")
-    println(s"HBATable COPYING ${srcTableNameAsString} TO ${destTableNameAsString}")
-    val srcTransformed = src.rdd().partitionBy(new RegionPartitioner(dest.numberOfRegions))
+    println(s"HBaseTable COPYING ${srcTableNameAsString} TO ${destTableNameAsString}")
+    val srcTransformed = src.rdd.partitionBy(new RegionPartitioner(dest.numberOfRegions))
     srcTransformed.foreachPartition(part => {
       val connection = ConnectionFactory.createConnection(broadCastConf.value)
       val destTable = connection.getBufferedMutator(TableName.valueOf(destTableNameAsString))

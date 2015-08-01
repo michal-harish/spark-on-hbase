@@ -86,6 +86,7 @@ You can then run the demo appliation as a shell:
 `./scripts/demo-graph-shell`
 
 # TODOs
+- fix spark-submit script and add an example into the simple demo
 - figure out a work-around for the bulk operations requiring the process to run under hbase user
 - temporarily added serialization to HBaseTable to have it working, but only HBaseRDD should assumed to be serialized, need refactoring the mapper interface
 - Mechanism for choosing HBaseJoin implementation must be done per operation, not simply configuration variable because the type of join depends on the relative volume of the RDDs not location or resource - but ideally it should be done by estimation, not requiring any control argument

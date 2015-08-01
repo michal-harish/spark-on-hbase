@@ -22,7 +22,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
   type HISTORY = scala.collection.mutable.MutableList[RDD[_]]
 
   /**
-   * LAYER is an abstract concept which is represented by a Key-Value Spark RDD with fixed key type - Vid - and
+   * LAYER is an abstract concept which is represented by a Key-Value Spark RDD with fixed key type - HKey - and
    * unspecified value type.
    * A general Graph may consist of several layers and as long as the elements in each are keyed by the same type the
    * set of layers can be viewed and analysied as a single graph.
@@ -30,7 +30,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
   type LAYER[X] = RDD[(HKey, X)]
 
   /**
-   * NETWORK is a LAYER which represents the structure of the graph. It is keyed by Vid (as any other LAYER) where each
+   * NETWORK is a LAYER which represents the structure of the graph. It is keyed by HKey (as any other LAYER) where each
    * value is a sequence of outgoing edges
    */
 
@@ -42,7 +42,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
   type PAIRS = LAYER[EDGE]
 
   /**
-   * POOL - is a list of IDs mapped to another list of IDs, for disconnected pool both Vid(s) in the tuple are same
+   * POOL - is a list of IDs mapped to another list of IDs, for disconnected pool both HKey(s) in the tuple are same
    */
   type POOL = LAYER[HKey]
 
@@ -53,7 +53,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
   /**
    * converts a network into a pool of pairs
    */
-  def flatten(net: NETWORK): POOL = net.map { case (vid, edges) => (vid, HKey.highest(vid, edges.map(_._1))) }
+  def flatten(net: NETWORK): POOL = net.map { case (key, edges) => (key, HKey.highest(key, edges.map(_._1))) }
 
   /**
    * generic histogram function
@@ -86,8 +86,8 @@ trait AGraph[PROPS <: Props[PROPS]] {
    * not efficient as netBSP but useful for small validation sets and incremental batches
    */
   final def bsp(in: NETWORK)(implicit partitioner: RegionPartitioner): NETWORK = {
-    deduplicate(in.flatMap { case (vid, edges) => {
-      (for (edge <- edges) yield ((edge._1, edges.filter(_._1 != edge._1)))) :+(vid, edges)
+    deduplicate(in.flatMap { case (key, edges) => {
+      (for (edge <- edges) yield ((edge._1, edges.filter(_._1 != edge._1)))) :+(key, edges)
     }
     })
   }
@@ -119,7 +119,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
 
   /**
    * combines all occurrences of the same vertex id into a network of unique vertices with combined and deduplicated edges
-   * merge-sort optimized implementation of (a ++ b).distinct.sortWith(Vid.comparator)
+   * merge-sort optimized implementation of (a ++ b).distinct.sortWith(HKey.comparator)
    * WARNING: because it is a merge sort, the individual edge sequences are expected to be already sorted
    * the input net RDD doesn't have to be sorted by key but the EDGES within each row MUST be sorted
    */
@@ -196,13 +196,13 @@ trait AGraph[PROPS <: Props[PROPS]] {
 
         private def loadAndMergeNextGroup: Boolean = {
           if (forward.hasNext) {
-            val vid: HKey = forward.head._1
+            val key: HKey = forward.head._1
             val group = mutable.MutableList[EDGES]()
             do {
               group += forward.head._2
               forward.next
-            } while (forward.hasNext && forward.head._1 == vid)
-            current = Some((vid, mergeSortAscending(group)))
+            } while (forward.hasNext && forward.head._1 == key)
+            current = Some((key, mergeSortAscending(group)))
           }
           current.isDefined
         }
@@ -221,7 +221,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
   }
 
   final def count(pool: POOL): (Long, Long) = {
-    val counts = pool.map { case (vid, maxVid) => (1L, if (vid.equals(maxVid)) 1L else 0L) }
+    val counts = pool.map { case (key, maxKey) => (1L, if (key.equals(maxKey)) 1L else 0L) }
       .aggregate((0L, 0L))((b, a) => (b._1 + a._1, b._2 + a._2), (b, c) => (b._1 + c._1, b._2 + c._2))
     println("COOKIES > USERS = " + counts._1 + " > " + counts._2 + " = DEDUPLICATION = " + counts._2.toDouble / counts._1 * 100 + " %")
     counts
@@ -267,11 +267,11 @@ trait AGraph[PROPS <: Props[PROPS]] {
     exp.collect.foreach(x => println(s"EXPANDED POOL ${x}"))
     val expandedProfile = exp.join(profile, partitioner)
     /**/
-    val invertedProfile = expandedProfile.map { case (vid, (maxVid, x)) => (maxVid, x) } //.reduceByKey( (a,b) => combiner(a,b))
-    val invertedPool = exp.map { case (vid, maxVid) => (maxVid, vid) }
-    invertedPool.join(invertedProfile, partitioner).map { case (maxVid, (vid, x)) => (vid, (maxVid, x)) }
+    val invertedProfile = expandedProfile.map { case (key, (maxKey, x)) => (maxKey, x) } //.reduceByKey( (a,b) => combiner(a,b))
+    val invertedPool = exp.map { case (key, maxKey) => (maxKey, key) }
+    invertedPool.join(invertedProfile, partitioner).map { case (maxKey, (key, x)) => (key, (maxKey, x)) }
       .join(pool, partitioner)
-      .map { case (vid, (maxProfile, originalMaxVid)) => (vid, maxProfile) }
+      .map { case (key, (maxProfile, originalMaxKey)) => (key, maxProfile) }
     //TODO pool.join(expandedProfile, partitioner).mapValues { case(maxVid, (maxVid2, x)) => (maxVid, x) }
   }
 
@@ -286,17 +286,17 @@ trait AGraph[PROPS <: Props[PROPS]] {
   final def aggregate(overlay: RDD[(HKey, (HKey, Long))]): (Long, Long, Long) = aggregate(overlay, (a: Long, b: Long) => a + b)
 
   final def aggregate[X](overlay: RDD[(HKey, (HKey, X))], sum: (X, X) => X): (Long, Long, X) = {
-    overlay.map { case (vid, (maxVid, x)) => (maxVid, (1L, x)) }
+    overlay.map { case (key, (maxKey, x)) => (maxKey, (1L, x)) }
       .reduceByKey((a, b) => (a._1 + b._1, sum(a._2, b._2)))
-      .map { case (maxVid, (numCookies, x)) => (1L, numCookies, x) }
+      .map { case (maxKey, (numCookies, x)) => (1L, numCookies, x) }
       .reduce((a, b) => (a._1 + b._1, a._2 + b._2, sum(a._3, b._3)))
   }
 
   final def aggregate[X, Y](overlay: RDD[(HKey, (HKey, X))]
                             , combiner: (X, X) => X, converter: (X) => Y, aggregator: (Y, Y) => Y): (Long, Long, Y) = {
-    overlay.map { case (vid, (maxVid, x)) => (maxVid, (1L, x)) }
+    overlay.map { case (key, (maxKey, x)) => (maxKey, (1L, x)) }
       .reduceByKey((a, b) => (a._1 + b._1, combiner(a._2, b._2)))
-      .map { case (maxVid, (numCookies, x)) => (1L, numCookies, converter(x)) }
+      .map { case (maxKey, (numCookies, x)) => (1L, numCookies, converter(x)) }
       .reduce((a, b) => (a._1 + b._1, a._2 + b._2, aggregator(a._3, b._3)))
   }
 
@@ -308,7 +308,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
     val j = modeled.join(validation).cache
     val subsetKeys = j.keys.collect.map(_.asString).toSeq
     val tpfpfn: (Double, Double, Double) = j.map({
-      case (vid, (modelEdges, validEdges)) => {
+      case (key, (modelEdges, validEdges)) => {
         val subsetModelEdges = modelEdges.map(_._1.asString).intersect(subsetKeys)
         val subsetValidEdges = validEdges.map(_._1.asString).intersect(subsetKeys)
         val tp = subsetModelEdges.intersect(subsetValidEdges).size.toDouble

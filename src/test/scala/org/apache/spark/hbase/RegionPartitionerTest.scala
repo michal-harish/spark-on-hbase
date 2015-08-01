@@ -52,7 +52,7 @@ class RegionPartitionerTest extends FlatSpec with Matchers {
 
   val hist = new scala.collection.mutable.HashMap[Int, Int]()
   val n = 1000000
-  println(s"TESTING DISTRIBUTION OF ${n} RANDOM VIDs ACROSS ${numRegions} REGIONS")
+  println(s"TESTING DISTRIBUTION OF ${n} RANDOM KEYs ACROSS ${numRegions} REGIONS")
   val e = n.toDouble / numRegions
   println(s"EXPECTED MEAN COUNT PER PARTITON = ${e}")
   println(s"BEST POSSIBLE DISTRIBUTION RANGE = [${e},${e}]")
@@ -60,8 +60,8 @@ class RegionPartitionerTest extends FlatSpec with Matchers {
   print("...")
   val t = System.currentTimeMillis()
   for (i <- (1 to n)) {
-    val vid = HKey("test", UUID.randomUUID.toString)
-    val part = p.getPartition(vid)
+    val key = HKey("test", UUID.randomUUID.toString)
+    val part = p.getPartition(key)
     if (hist.contains(part)) hist += (part -> (hist(part) + 1)) else hist += (part -> 1)
   }
   println(s"${System.currentTimeMillis() - t} ms")
