@@ -1,6 +1,6 @@
 package org.apache.spark.hbase.examples.simple
 
-import org.apache.hadoop.hbase.HConstants._
+import org.apache.hadoop.hbase.CellUtil
 import org.apache.hadoop.hbase.client.Result
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
@@ -24,52 +24,64 @@ object HBaseTableSimple {
 
 class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBaseTable[String](sc, tableNameAsString) {
 
-
   override def keyToBytes = (key: String) => key.getBytes
 
   override def bytesToKey = (bytes: Array[Byte]) => new String(bytes)
 
-  def rddNumCells: HBaseRDD[String, Short] = rdd(OLDEST_TIMESTAMP, LATEST_TIMESTAMP).mapValues(result => {
-    var numCells: Int = 0
-    val scanner = result.cellScanner
-    while (scanner.advance) {
-      numCells = numCells + 1
+  val Tags = new HBaseFunction[List[String]]("T") {
+    val T = Bytes.toBytes("T")
+
+    override def apply(result: Result): List[String] = {
+      val tagList = List.newBuilder[String]
+      val scanner = result.cellScanner
+      while (scanner.advance) {
+        val kv = scanner.current
+        if (CellUtil.matchingFamily(kv, T)) {
+          val tag = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
+          tagList += tag
+        }
+      }
+      tagList.result
     }
-    numCells.toShort
-  })
+  }
 
-  def rddTags: HBaseRDD[String, List[String]] = rdd(OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "T").mapValues((row: Result) => {
-    val tagList = List.newBuilder[String]
-    val scanner = row.cellScanner
-    while (scanner.advance) {
-      val kv = scanner.current
-      val tag = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
-      tagList += tag
+  val Features = new HBaseFunction[Map[String, Double]]("F") {
+    val F = Bytes.toBytes("F")
+
+    override def apply(result: Result): Map[String, Double] = {
+      val featureMapBuilder = Map.newBuilder[String, Double]
+      val scanner = result.cellScanner
+      while (scanner.advance) {
+        val kv = scanner.current
+        if (CellUtil.matchingFamily(kv, F)) {
+          val feature = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
+          val value = Bytes.toDouble(kv.getValueArray, kv.getValueOffset)
+          featureMapBuilder += ((feature, value))
+        }
+      }
+      featureMapBuilder.result
     }
-    tagList.result
-  })
+  }
 
+  val CellCount = new HBaseFunction[Short]("T", "F") {
+    override def apply(result: Result): Short = {
+      var numCells: Int = 0
+      val scanner = result.cellScanner
+      while (scanner.advance) {
+        numCells = numCells + 1
+      }
+      numCells.toShort
+    }: Short
+  }
 
-  def rddFeatures = rdd(OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F").mapValues((row: Result) => {
-    val featureMapBuilder = Map.newBuilder[String, Double]
-    val scanner = row.cellScanner
-    while (scanner.advance) {
-      val kv = scanner.current
-      val feature = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
-      val value = Bytes.toDouble(kv.getValueArray, kv.getValueOffset)
-      featureMapBuilder += ((feature, value))
-    }
-    featureMapBuilder.result
-  })
+  val Propensity = new HBaseFunction[Double]("F:propensity") {
+    val F = Bytes.toBytes("F")
+    val propensity = Bytes.toBytes("propensity")
 
-
-  def rddPropensity = {
-    val cfFeatures = Bytes.toBytes("F")
-    val qPropensity = Bytes.toBytes("propensity")
-    rdd(OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F:propensity").mapValues((row: Result) => {
-      val cell = row.getColumnLatestCell(cfFeatures, qPropensity)
+    override def apply(result: Result): Double = {
+      val cell = result.getColumnLatestCell(F, propensity)
       Bytes.toDouble(cell.getValueArray, cell.getValueOffset)
-    })
+    }
   }
 
 }

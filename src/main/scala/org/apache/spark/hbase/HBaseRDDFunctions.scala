@@ -18,12 +18,22 @@ import scala.reflect.ClassTag
  *
  * TODO make sure we understand what self.withScope does
  */
+abstract class HBaseFunction[V](val cols: String*) extends Function[Result, V] with Serializable
+
+//abstract class HBaseFunctionWithInverse[V](val cols: String*) extends Function[Result, V] with Serializable {
+//  def inverse(value: V): Array[Byte]
+//}
 
 class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt: ClassTag[V]) extends Serializable {
 
+  def mapValues[U: ClassTag](f: HBaseFunction[U]): HBaseRDD[K, U] = self.withScope {
+    val cleanF = self.context.clean(f)
+    self.mapResultRDD[U]((result) => cleanF(result), f.cols:_*)
+  }
+
   def mapValues[U: ClassTag](f: (V) => U): HBaseRDD[K, U] = self.withScope {
     val cleanF = self.context.clean(f)
-    self.mapResultRDD[U]((result) => cleanF(self.resultToValue(result)))
+    self.mapResultRDD[U]((result) => cleanF(self.resultToValue(result)), self.columns:_*)
   }
 
   // TODO provide per-join options multieget size and type of HBaseJoin implementation

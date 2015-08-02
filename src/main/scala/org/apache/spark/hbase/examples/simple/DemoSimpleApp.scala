@@ -15,6 +15,8 @@ class DemoSimpleApp(sc: SparkContext) {
 
   val table = new HBaseTableSimple(sc: SparkContext, "demo-simple")
 
+  import table._
+
   def help = {
     println("Spark-on-HBase Graph Demo shell help:")
     println(" help - print this usage information")
@@ -25,6 +27,7 @@ class DemoSimpleApp(sc: SparkContext) {
     println(" collectFeatures - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Double]]")
     println(" collectPropensity - collect column `propensity` from family `F` as a specialised HBaseRDD[String, Double]")
     println(" collectTags - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Double]]")
+    println(" collectTagsAndFeatures - collect both column families T and F from the demo table and map it to specialised HBaseRDD[String, (List[String], Map[String,Double])]")
     println(" join - example join")
   }
 
@@ -62,27 +65,32 @@ class DemoSimpleApp(sc: SparkContext) {
   }
 
   def collectFeatures = {
-    println("> table.rdd.collect.foreach(println)")
-    table.rddFeatures.collect.foreach(println)
+    println("> table.rdd.mapValues(Features).collect.foreach(println)")
+    table.rdd.mapValues(Features).collect.foreach(println)
   }
 
   def collectPropensity = {
-    println("> table.rddFeatures.collect.foreach(println)")
-    table.rddFeatures.collect.foreach(println)
+    println("> table.rdd.mapValues(Propensity).collect.foreach(println)")
+    table.rdd.mapValues(Propensity).collect.foreach(println)
   }
 
   def collectTags = {
-    println("> table.rddTags.collect.foreach(println)")
-    table.rddTags.collect.foreach(println)
+    println("> table.rdd.mapValues(Tags).collect.foreach(println)")
+    table.rdd.mapValues(Tags).collect.foreach(println)
   }
   def collectNumCells = {
-    println("> table.rddNumCells.collect.foreach(println)")
-    table.rddNumCells.collect.foreach(println)
+    println("> table.rdd.mapValues(CellCount).collect.foreach(println)")
+    table.rdd.mapValues(CellCount).collect.foreach(println)
+  }
+
+  def collectTagsAndFeatures = {
+    println("> table.rdd(\"T\", \"F\").mapValues(result => (Tags(result), Features(result))).collect.foreach(println)")
+    table.rdd("T", "F").mapValues(result => (Tags(result), Features(result))).collect.foreach(println)
   }
 
   def join = {
-    println("> table.rddTags.join(table.rddTags.mapValues(_.hashCode)).collect.foreach(println)")
-    table.rddTags.join(table.rddTags.mapValues(_.hashCode)).collect.foreach(println)
+    println("> table.rdd.mapValues(Tags).join(table.rdd.mapValues(Tags).mapValues(_.hashCode)).collect.foreach(println)")
+    table.rdd.mapValues(Tags).join(table.rdd.mapValues(Tags).mapValues(_.hashCode)).collect.foreach(println)
   }
 
 }
