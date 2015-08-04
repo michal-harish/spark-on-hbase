@@ -20,7 +20,8 @@ import scala.reflect.ClassTag
  *
  * TODO make sure we understand what self.withScope does
  */
-abstract class HBaseFunction[V](val cols: String*) extends Function[Result, V] with Serializable {
+abstract class HBaseFunction[V](val cols: String*) extends Serializable {
+  def apply(v1 : Result) : V
   def applyInverse(value: V, mutation: Put) = {}
 }
 
@@ -28,7 +29,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
 
   def mapValues[U: ClassTag](f: HBaseFunction[U]): HBaseRDD[K, U] = self.withScope {
     val cleanF = self.context.clean(f)
-    self.mapResultRDD[U]((result) => cleanF(result), f.cols:_*)
+    self.mapResultRDD[U]((result) => f(result), f.cols:_*)
   }
 
   def mapValues[U: ClassTag](f: (V) => U): HBaseRDD[K, U] = self.withScope {
@@ -36,28 +37,34 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
     self.mapResultRDD[U]((result) => cleanF(self.resultToValue(result)), self.columns:_*)
   }
 
-  def join[W](other: RDD[(K, W)]): RDD[(K, (V, W))] = join(other, self.partitioner.get)
-  // TODO provide per-join options multieget size and type of HBaseJoin implementation
+  //TODO flatMapValues[U: ClassTag](f: (V) => Iterator[U]): HBaseRDD[K, U]
+
   def join[W](other: RDD[(K, W)], partitioner: Partitioner): RDD[(K, (V, W))] = self.withScope {
+    join(other).partitionBy(partitioner)
+  }
+  // TODO provide per-join options multieget size and type of HBaseJoin implementation
+  def join[W](other: RDD[(K, W)]): RDD[(K, (V, W))] = self.withScope {
     val j = if (multiGetSize == -1) {
       new HBaseJoinRangeScan[W](self.cf: _*)
     } else {
       new HBaseJoinMultiGet[W](1000, self.cf: _*)
     }
-    j(self, other).partitionBy(partitioner)
+    j(self, other)
   }
-
-  def rightOuterJoin[W: ClassTag](other: RDD[(K, W)]): RDD[(K, (Option[V], W))] = rightOuterJoin(other, self.partitioner.get)
 
   def rightOuterJoin[W: ClassTag](other: RDD[(K, W)], partitioner: Partitioner): RDD[(K, (Option[V], W))] = self.withScope {
-    val l = new HBaseLookupMultiGet[W](multiGetSize, self.cf: _*)
-    l(self, other.mapValues(x => (None.asInstanceOf[Option[V]], x))).partitionBy(partitioner)
+    rightOuterJoin(other).partitionBy(partitioner)
   }
 
-  //TODO rename lookup to something else, lookup already exists in PairRDDFunctions and servers different purpose
-  def lookup[W](other: RDD[(K, (Option[V], W))]): RDD[(K, (Option[V], W))] = lookup(other)
+  def rightOuterJoin[W: ClassTag](other: RDD[(K, W)]): RDD[(K, (Option[V], W))] = self.withScope {
+    val l = new HBaseLookupMultiGet[W](multiGetSize, self.cf: _*)
+    l(self, other.mapValues(x => (None.asInstanceOf[Option[V]], x)))
+    .mapValues { case (left,right) => (if (left.isDefined && left.get == null) None else left, right)}
+  }
 
-  def lookup[W](other: RDD[(K, (Option[V], W))], partitioner: Partitioner): RDD[(K, (Option[V], W))] = self.withScope {
+  def fill[W](other: RDD[(K, (Option[V], W))]): RDD[(K, (Option[V], W))] = fill(other)
+
+  def fill[W](other: RDD[(K, (Option[V], W))], partitioner: Partitioner): RDD[(K, (Option[V], W))] = self.withScope {
     val l = new HBaseLookupMultiGet[W](multiGetSize, self.cf: _*)
     l(self, other).partitionBy(partitioner)
   }

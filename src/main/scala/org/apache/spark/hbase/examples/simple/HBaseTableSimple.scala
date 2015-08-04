@@ -35,7 +35,7 @@ object HBaseTableSimple {
       maxVersions = 1, Algorithm.SNAPPY, blocksize = 64 * 1024)
   )
 
-  val Tags = new HBaseFunction[List[String]]("T") {
+  def Tags = new HBaseFunction[List[String]]("T") {
     val T = Bytes.toBytes("T")
     override def apply(result: Result): List[String] = {
       {
