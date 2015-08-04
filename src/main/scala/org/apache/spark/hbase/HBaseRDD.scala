@@ -8,7 +8,7 @@ import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import scala.collection.JavaConverters._
 import org.apache.hadoop.hbase.filter.{FuzzyRowFilter, Filter}
-import org.apache.spark.{Partition, SerializableWritable, SparkContext, TaskContext}
+import org.apache.spark._
 
 import scala.reflect.ClassTag
 
@@ -28,6 +28,7 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
   @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
   protected val configuration = new SerializableWritable(hbaseConf)
   protected val regionSplits: Array[(Array[Byte], Array[Byte])] = Utils.getRegionSplits(hbaseConf, tableName)
+  @transient override val partitioner: Option[Partitioner] = Some(new RegionPartitioner(regionSplits.size))
 
   val cf: Seq[Array[Byte]] = columns.map(_ match {
     case cf: String if (!cf.contains(':')) => Bytes.toBytes(cf)

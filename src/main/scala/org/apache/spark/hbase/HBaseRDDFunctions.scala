@@ -5,7 +5,7 @@ import java.util
 import org.apache.hadoop.hbase.TableName
 import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.SerializableWritable
+import org.apache.spark.{Partitioner, SerializableWritable}
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
@@ -14,15 +14,15 @@ import scala.reflect.ClassTag
 /**
  * Created by mharis on 27/07/15.
  *
- * Functions available for HBaseRDD via implicit conversions
+ * Functions available for HBaseRDD via implicit conversions and HBaseFunction which
+ * is used as a mapper of hbase row results and is an extension of a Function with some
+ * added characteristics.
  *
  * TODO make sure we understand what self.withScope does
  */
-abstract class HBaseFunction[V](val cols: String*) extends Function[Result, V] with Serializable
-
-//abstract class HBaseFunctionWithInverse[V](val cols: String*) extends Function[Result, V] with Serializable {
-//  def inverse(value: V): Array[Byte]
-//}
+abstract class HBaseFunction[V](val cols: String*) extends Function[Result, V] with Serializable {
+  def applyInverse(value: V, mutation: Put) = {}
+}
 
 class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt: ClassTag[V]) extends Serializable {
 
@@ -36,20 +36,30 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
     self.mapResultRDD[U]((result) => cleanF(self.resultToValue(result)), self.columns:_*)
   }
 
+  def join[W](other: RDD[(K, W)]): RDD[(K, (V, W))] = join(other, self.partitioner.get)
   // TODO provide per-join options multieget size and type of HBaseJoin implementation
-  def join[W](other: RDD[(K, W)]): RDD[(K, (V, W))] = self.withScope {
+  def join[W](other: RDD[(K, W)], partitioner: Partitioner): RDD[(K, (V, W))] = self.withScope {
     val j = if (multiGetSize == -1) {
       new HBaseJoinRangeScan[W](self.cf: _*)
     } else {
       new HBaseJoinMultiGet[W](1000, self.cf: _*)
     }
-    j(self, other)
-    //TODO partitioner optional argument - if is not equal to the self.partitioner add .partitionBy(partitioner)
+    j(self, other).partitionBy(partitioner)
   }
 
-  def lookup[W](other: RDD[(K, (Option[V], W))]): RDD[(K, (Option[V], W))] = self.withScope {
+  def rightOuterJoin[W: ClassTag](other: RDD[(K, W)]): RDD[(K, (Option[V], W))] = rightOuterJoin(other, self.partitioner.get)
+
+  def rightOuterJoin[W: ClassTag](other: RDD[(K, W)], partitioner: Partitioner): RDD[(K, (Option[V], W))] = self.withScope {
     val l = new HBaseLookupMultiGet[W](multiGetSize, self.cf: _*)
-    l(self, other)
+    l(self, other.mapValues(x => (None.asInstanceOf[Option[V]], x))).partitionBy(partitioner)
+  }
+
+  //TODO rename lookup to something else, lookup already exists in PairRDDFunctions and servers different purpose
+  def lookup[W](other: RDD[(K, (Option[V], W))]): RDD[(K, (Option[V], W))] = lookup(other)
+
+  def lookup[W](other: RDD[(K, (Option[V], W))], partitioner: Partitioner): RDD[(K, (Option[V], W))] = self.withScope {
+    val l = new HBaseLookupMultiGet[W](multiGetSize, self.cf: _*)
+    l(self, other).partitionBy(partitioner)
   }
 
   val multiGetSize = 1000 // TODO make multiGetSize configurable

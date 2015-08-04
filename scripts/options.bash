@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DRIVER=2g
-WORKERS=100
+WORKERS=32
 MEMORY="1g"
 OVERHEAD="384"
 EXTRAS="-XX:PermSize=64M -XX:MaxPermSize=256M"

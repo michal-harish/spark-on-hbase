@@ -86,6 +86,7 @@ You can then run the demo appliation as a shell:
 `./scripts/demo-graph-shell`
 
 # TODOs
+- think about re-design under DataFrame API - it would be nice to push down column filters, fuzzy filters etc. and then select(...)
 - fix spark-submit script and add an example into the simple demo
 - figure out a work-around for the bulk operations requiring the process to run under hbase user
 - temporarily added serialization to HBaseTable to have it working, but only HBaseRDD should assumed to be serialized, need refactoring the mapper interface

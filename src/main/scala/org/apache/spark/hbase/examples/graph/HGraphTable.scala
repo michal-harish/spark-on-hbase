@@ -193,7 +193,7 @@ with AGraph[HE] {
       case java.lang.Double.TYPE => (value: T) => Bytes.toBytes(value.asInstanceOf[Double])
       case _ => throw new UnsupportedOperationException
     }
-    update(cfFeatures, x.mapValues(f => (Map(Bytes.toBytes(f._1) ->(t(f._2), HConstants.LATEST_TIMESTAMP)))))
+    put(cfFeatures, x.mapValues(f => (Map(Bytes.toBytes(f._1) ->(t(f._2), HConstants.LATEST_TIMESTAMP)))))
   }
 
   def updateFeatures[T](feature: String, x: LAYER[T])(implicit tag: ClassTag[T]) = {
@@ -203,7 +203,7 @@ with AGraph[HE] {
       case java.lang.Double.TYPE => (value: T) => Bytes.toBytes(value.asInstanceOf[Double])
       case _ => throw new UnsupportedOperationException
     }
-    update(cfFeatures, x.mapValues(f => (Map(fFeature ->(t(f), HConstants.LATEST_TIMESTAMP)))))
+    put(cfFeatures, x.mapValues(f => (Map(fFeature ->(t(f), HConstants.LATEST_TIMESTAMP)))))
   }
 
   def incFeature(feature: String, incRdd: LAYER[Long]) {
@@ -327,7 +327,7 @@ with AGraph[HE] {
 
   def updateNetRdd(update: NETWORK) = update.mapValues(_.map { case (key, he) => (key.bytes, he.hbaseValue) }.toMap)
 
-  def updateNet(rdd: NETWORK): Long = super.update(cfNet, updateNetRdd(rdd))
+  def updateNet(rdd: NETWORK): Long = super.put(cfNet, updateNetRdd(rdd))
 
   def loadNet(rdd: NETWORK, completeAsync: Boolean = true): Long = {
     super.bulkLoad(cfNet, updateNetRdd(rdd), completeAsync)

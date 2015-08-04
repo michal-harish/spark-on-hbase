@@ -1,8 +1,8 @@
 package org.apache.spark.hbase.examples.simple
 
-import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.Utils
+import org.apache.spark.hbase.examples.simple.HBaseTableSimple._
 
 /**
  * Created by mharis on 28/07/15.
@@ -11,16 +11,15 @@ class DemoSimpleApp(sc: SparkContext) {
 
   implicit val context = sc
 
-  Utils.updateSchema(sc, "demo-simple", numRegions = 100, HBaseTableSimple.schema:_*)
+  Utils.updateSchema(sc, "demo-simple", numRegions = 32, HBaseTableSimple.schema: _*)
 
   val table = new HBaseTableSimple(sc: SparkContext, "demo-simple")
 
-  import table._
-
   def help = {
-    println("Spark-on-HBase Graph Demo shell help:")
+    println("Spark-on-HBase Simple Demo shell help:")
     println(" help - print this usage information")
     println(" table - main example instance of the HBaseTableSimple `demo-simple`")
+    println(" collect <RDD> - collet and print the given rdd fully")
     println(" put  - put example data into the underlying hbase table `demo-simple`")
     println(" collect - collect all data from the demo table")
     println(" collectNumCells - count number of cells per row in a specialised HBaseRDD[String, Short]")
@@ -33,30 +32,17 @@ class DemoSimpleApp(sc: SparkContext) {
 
   def put = {
     println("Updating `demo-simple` column family `F` - Features")
-    val dataForColumnFamilyF = sc.parallelize(Array(
-      "row1" -> Map(
-        Bytes.toBytes("propensity") ->(Bytes.toBytes(0.5), System.currentTimeMillis),
-        Bytes.toBytes("width") ->(Bytes.toBytes(100.0), System.currentTimeMillis)
-      ),
-      "row2" -> Map(
-        Bytes.toBytes("propensity") ->(Bytes.toBytes(0.9), System.currentTimeMillis),
-        Bytes.toBytes("width") ->(Bytes.toBytes(300.0), System.currentTimeMillis)
-      )
-    ))
-    table.update(Bytes.toBytes("F"), dataForColumnFamilyF)
+
+    table.update(Features, sc.parallelize(Array(
+      "row1" -> Map("propensity" -> 0.5, "width" -> 100.0),
+      "row2" -> Map("propensity" -> 0.9, "width" -> 300.0)
+    )))
 
     println("Updating `demo-simple` column family `T` - Tags")
-    val dataForColumnFamilyT = sc.parallelize(Array(
-      "row1" -> Map(
-        Bytes.toBytes("lego") ->(Array[Byte](), System.currentTimeMillis),
-        Bytes.toBytes("music") ->(Array[Byte](), System.currentTimeMillis),
-        Bytes.toBytes("motorbike") ->(Array[Byte](), System.currentTimeMillis)
-      ),
-      "row2" -> Map(
-        Bytes.toBytes("cinema") ->(Array[Byte](), System.currentTimeMillis)
-      )
-    ))
-    table.update(Bytes.toBytes("T"), dataForColumnFamilyT)
+    table.update(Tags, sc.parallelize(Array(
+      "row1" -> List("lego", "music", "motorbike"),
+      "row2" -> List("cinema")
+    )))
   }
 
   def collect = {
@@ -66,7 +52,7 @@ class DemoSimpleApp(sc: SparkContext) {
 
   def collectFeatures = {
     println("> table.rdd.mapValues(Features).collect.foreach(println)")
-    table.rdd.mapValues(Features).collect.foreach(println)
+    table.rdd("T").mapValues(Features).collect.foreach(println)
   }
 
   def collectPropensity = {
@@ -78,6 +64,7 @@ class DemoSimpleApp(sc: SparkContext) {
     println("> table.rdd.mapValues(Tags).collect.foreach(println)")
     table.rdd.mapValues(Tags).collect.foreach(println)
   }
+
   def collectNumCells = {
     println("> table.rdd.mapValues(CellCount).collect.foreach(println)")
     table.rdd.mapValues(CellCount).collect.foreach(println)
@@ -89,8 +76,16 @@ class DemoSimpleApp(sc: SparkContext) {
   }
 
   def join = {
-    println("> table.rdd.mapValues(Tags).join(table.rdd.mapValues(Tags).mapValues(_.hashCode)).collect.foreach(println)")
-    table.rdd.mapValues(Tags).join(table.rdd.mapValues(Tags).mapValues(_.hashCode)).collect.foreach(println)
+    println("> val other = sc.parallelize(Array(\"row1\" -> \"Moo\", \"row2\" -> \"Foo\", \"row3\" -> \"Bar\"))")
+    println("> table.rdd.mapValues(Tags).join(other).collect.foreach(println)")
+    val other = sc.parallelize(Array("row1" -> "Moo", "row2" -> "Foo", "row3" -> "Bar"))
+    table.rdd.mapValues(Tags).join(other).collect.foreach(println)
+  }
+
+  def rightOuterJoin = {
+    println("> val other = sc.parallelize(Array(\"row1\" -> \"Moo\", \"row2\" -> \"Foo\", \"row3\" -> \"Bar\"))")
+    val other = sc.parallelize(Array("row1" -> "Moo", "row2" -> "Foo", "row3" -> "Bar"))
+    table.rdd.mapValues(Tags).rightOuterJoin(other)
   }
 
 }

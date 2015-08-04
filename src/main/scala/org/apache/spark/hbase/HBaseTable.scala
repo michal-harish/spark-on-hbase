@@ -36,6 +36,8 @@ import scala.reflect.ClassTag
  */
 abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tableNameAsString: String) extends Serializable {
 
+  type HBaseResultFunction[X] = Function[Result, X]
+
   @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
 
   @transient val tableName = TableName.valueOf(tableNameAsString)
@@ -50,23 +52,23 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   type D = HBaseRDD[K, Result]
 
-  def rdd:D = rdd(Consistency.STRONG, OLDEST_TIMESTAMP, LATEST_TIMESTAMP)
+  def rdd: D = rdd(Consistency.STRONG, OLDEST_TIMESTAMP, LATEST_TIMESTAMP)
 
-  def rdd(consistency: Consistency):D = rdd(consistency, OLDEST_TIMESTAMP, LATEST_TIMESTAMP)
+  def rdd(consistency: Consistency): D = rdd(consistency, OLDEST_TIMESTAMP, LATEST_TIMESTAMP)
 
-  def rdd(columns: String*):D = rdd(Consistency.STRONG, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
+  def rdd(columns: String*): D = rdd(Consistency.STRONG, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
 
-  def rdd(consistency: Consistency, columns: String*):D = rdd(consistency, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
+  def rdd(consistency: Consistency, columns: String*): D = rdd(consistency, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
 
-  def rdd(minStamp: Long, maxStamp: Long, columns: String*):D = rdd(Consistency.STRONG, minStamp, maxStamp, columns: _*)
+  def rdd(minStamp: Long, maxStamp: Long, columns: String*): D = rdd(Consistency.STRONG, minStamp, maxStamp, columns: _*)
 
-  def rdd(consistency: Consistency, minStamp: Long, maxStamp: Long, columns: String*):D = {
+  def rdd(consistency: Consistency, minStamp: Long, maxStamp: Long, columns: String*): D = {
     rdd[Result]((result: Result) => result, consistency, minStamp, maxStamp, columns: _*)
   }
 
   private def rdd[V](valueMapper: (Result) => V,
-                     consistency: Consistency, minStamp: Long, maxStamp: Long, columns: String*): HBaseRDD[K,V] = {
-    new HBaseRDD[K,V](sc, tableNameAsString, consistency, minStamp, maxStamp, null, columns: _*) {
+                     consistency: Consistency, minStamp: Long, maxStamp: Long, columns: String*): HBaseRDD[K, V] = {
+    new HBaseRDD[K, V](sc, tableNameAsString, consistency, minStamp, maxStamp, null, columns: _*) {
       override def bytesToKey = HBaseTable.this.bytesToKey
 
       override def keyToBytes = HBaseTable.this.keyToBytes
@@ -75,11 +77,48 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
     }
   }
 
-  def update(family: Array[Byte], updateRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])])(implicit tag: ClassTag[K]): Long = {
+  def select(functions: Seq[HBaseFunction[_]])(implicit k: ClassTag[K]): HBaseRDD[K, Seq[_]] = {
+    this.rdd(functions.flatMap(_.cols): _*).mapValues(result => functions.map(_(result)))
+  }
+
+  def select[F1: ClassTag](f1: HBaseFunction[F1])(implicit k: ClassTag[K]): HBaseRDD[K, F1] = {
+    this.rdd(f1.cols: _*).mapValues(result => f1(result))
+  }
+
+  def select[F1: ClassTag, F2: ClassTag](f1: HBaseFunction[F1], f2: HBaseFunction[F2])
+                                        (implicit k: ClassTag[K]): HBaseRDD[K, (F1, F2)] = {
+    this.rdd(f1.cols ++ f2.cols: _*).mapValues(result => (f1(result), f2(result)))
+  }
+
+  def select[F1: ClassTag, F2: ClassTag, F3: ClassTag](
+                                                        f1: HBaseFunction[F1],
+                                                        f2: HBaseFunction[F2],
+                                                        f3: HBaseFunction[F3]
+                                                        )(implicit k: ClassTag[K]): HBaseRDD[K, (F1, F2, F3)] = {
+    this.rdd(f1.cols ++ f2.cols ++ f3.cols: _*).mapValues(result => (f1(result), f2(result), f3(result)))
+  }
+
+  def select[F1: ClassTag, F2: ClassTag, F3: ClassTag, F4: ClassTag](
+                                                                      f1: HBaseFunction[F1],
+                                                                      f2: HBaseFunction[F2],
+                                                                      f3: HBaseFunction[F3],
+                                                                      f4: HBaseFunction[F4]
+                                                                      )(implicit k: ClassTag[K]): HBaseRDD[K, (F1, F2, F3, F4)] = {
+    this.rdd(f1.cols ++ f2.cols ++ f3.cols ++ f4.cols: _*).mapValues(
+      result => (f1(result), f2(result), f3(result), f4(result)))
+  }
+
+  def update[V](f: HBaseFunction[V], u: RDD[(K,V)]) = {
+    val broadCastConf = new SerializableWritable(hbaseConf)
+    val tableNameAsString = this.tableNameAsString
+    //f.applyInverse()
+  }
+
+
+  def put(family: Array[Byte], updateRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])])(implicit tag: ClassTag[K]): Long = {
     val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
     val updateCount = sc.accumulator(0L, "HGraph Net Update Counter")
-    val keyToBytes = this.keyToBytes
     println(s"HBATable ${tableNameAsString} UPDATE RDD PARTITIONED BY ${updateRdd.partitioner}")
     updateRdd.partitionBy(partitioner).foreachPartition(part => {
       val connection = ConnectionFactory.createConnection(broadCastConf.value)
@@ -301,5 +340,5 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
     if (f.isDirectory) fs.listStatus(f.getPath).foreach(f1 => verifyFileStatus(fs, f1, verifyOwner))
     if (f.getOwner != verifyOwner) throw new IllegalStateException(s"This job must be run as `${verifyOwner}` user")
   }
-  
+
 }

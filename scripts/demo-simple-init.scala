@@ -20,6 +20,6 @@ val app = new DemoSimpleApp(sc)
 
 import app._
 
-import table._
+import HBaseTableSimple._
 
 help
