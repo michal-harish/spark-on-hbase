@@ -15,19 +15,8 @@ import org.apache.spark.hbase._
  * 'F' Column Family 'Features' - here the columns will be treated as [String -> Double] key value pairs
  * 'T' Column Family 'Tags' - only using qualifiers to have a Set[String]
  */
-
-class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBaseTable[String](sc, tableNameAsString) {
-
-  override def keyToBytes = (key: String) => key.getBytes
-
-  override def bytesToKey = (bytes: Array[Byte]) => new String(bytes)
-
-}
-
-/**
- * We provide closures for spark operations from a top-level object for smoother serialisation.
- */
 object HBaseTableSimple {
+
   val schema = Seq(
     Utils.column("T", inMemory = false, ttlSeconds = 86400 * 90, BloomType.ROW,
       maxVersions = 1, Algorithm.SNAPPY, blocksize = 64 * 1024),
@@ -35,7 +24,15 @@ object HBaseTableSimple {
       maxVersions = 1, Algorithm.SNAPPY, blocksize = 64 * 1024)
   )
 
-  def Tags = new HBaseFunction[List[String]]("T") {
+}
+
+class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBaseTable[String](sc, tableNameAsString) {
+
+  override def keyToBytes = (key: String) => Bytes.toBytes(key)
+
+  override def bytesToKey = (bytes: Array[Byte]) => Bytes.toString(bytes)
+
+  val Tags = new HBaseFunction[List[String]]("T") {
     val T = Bytes.toBytes("T")
     override def apply(result: Result): List[String] = {
       {
@@ -104,7 +101,9 @@ object HBaseTableSimple {
     override def applyInverse(value: Double, mutation: Put) {
       mutation.addColumn(F, propensity, Bytes.toBytes(value))
     }
+
   }
 
 }
+
 

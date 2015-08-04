@@ -77,10 +77,6 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
     }
   }
 
-  def select(functions: Seq[HBaseFunction[_]])(implicit k: ClassTag[K]): HBaseRDD[K, Seq[_]] = {
-    this.rdd(functions.flatMap(_.cols): _*).mapValues(result => functions.map(_(result)))
-  }
-
   def select[F1: ClassTag](f1: HBaseFunction[F1])(implicit k: ClassTag[K]): HBaseRDD[K, F1] = {
     this.rdd(f1.cols: _*).mapValues(result => f1(result))
   }
@@ -106,6 +102,10 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
                                                                       )(implicit k: ClassTag[K]): HBaseRDD[K, (F1, F2, F3, F4)] = {
     this.rdd(f1.cols ++ f2.cols ++ f3.cols ++ f4.cols: _*).mapValues(
       result => (f1(result), f2(result), f3(result), f4(result)))
+  }
+
+  def select(functions: Seq[HBaseFunction[_]])(implicit k: ClassTag[K]): HBaseRDD[K, Seq[_]] = {
+    this.rdd(functions.flatMap(_.cols): _*).mapValues(result => functions.map(_(result)))
   }
 
   def update[V](f: HBaseFunction[V], u: RDD[(K,V)]) = {

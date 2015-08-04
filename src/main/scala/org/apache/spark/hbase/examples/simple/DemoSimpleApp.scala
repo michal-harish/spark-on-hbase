@@ -2,10 +2,10 @@ package org.apache.spark.hbase.examples.simple
 
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.Utils
-import org.apache.spark.hbase.examples.simple.HBaseTableSimple._
 
 /**
  * Created by mharis on 28/07/15.
+ *
  */
 class DemoSimpleApp(sc: SparkContext) {
 
@@ -31,16 +31,18 @@ class DemoSimpleApp(sc: SparkContext) {
     println(" rightOuterJoin - example rightOuterJoin")
   }
 
+  //TODO table.select(Tags).filter(Propensity > 0.5) - push the filter down to hbase server side
+
   def put = {
     println("Updating `demo-simple` column family `F` - Features")
 
-    table.update(Features, sc.parallelize(Array(
+    table.update(table.Features, sc.parallelize(Array(
       "row1" -> Map("propensity" -> 0.5, "width" -> 100.0),
       "row2" -> Map("propensity" -> 0.9, "width" -> 300.0)
     )))
 
     println("Updating `demo-simple` column family `T` - Tags")
-    table.update(Tags, sc.parallelize(Array(
+    table.update(table.Tags, sc.parallelize(Array(
       "row1" -> List("lego", "music", "motorbike"),
       "row2" -> List("cinema")
     )))
@@ -52,42 +54,42 @@ class DemoSimpleApp(sc: SparkContext) {
   }
 
   def collectFeatures = {
-    println("> table.select(Features).collect.foreach(println)")
-    table.select(Features).collect.foreach(println)
+    println("> table.select(table.Features).collect.foreach(println)")
+    table.select(table.Features).collect.foreach(println)
   }
 
   def collectPropensity = {
-    println("> table.select(Propensity).collect.foreach(println)")
-    table.select(Propensity).collect.foreach(println)
+    println("> table.select(table.Propensity).collect.foreach(println)")
+    table.select(table.Propensity).collect.foreach(println)
   }
 
   def collectTags = {
-    println("> table.select(Tags).collect.foreach(println)")
-    table.select(Tags).collect.foreach(println)
+    println("> table.select(table.Tags).collect.foreach(println)")
+    table.select(table.Tags).collect.foreach(println)
   }
 
   def collectNumCells = {
-    println("> table.select(CellCount).collect.foreach(println)")
-    table.select(CellCount).collect.foreach(println)
+    println("> table.select(table.CellCount).collect.foreach(println)")
+    table.select(table.CellCount).collect.foreach(println)
   }
 
   def collectTagsAndFeatures = {
-    println("> table.select(Tags, Features).collect.foreach(println)")
-    table.select(Tags, Features).collect.foreach(println)
+    println("> table.select(table.Tags, table.Features).collect.foreach(println)")
+    table.select(table.Tags, table.Features).collect.foreach(println)
   }
 
   def join = {
     println("> val other = sc.parallelize(Array(\"row1\" -> \"Moo\", \"row2\" -> \"Foo\", \"row3\" -> \"Bar\"))")
-    println("> table.select(Tags).join(other).collect.foreach(println)")
+    println("> table.select(table.Tags).join(other).collect.foreach(println)")
     val other = sc.parallelize(Array("row1" -> "Moo", "row2" -> "Foo", "row3" -> "Bar"))
-    table.select(Tags).join(other).collect.foreach(println)
+    table.select(table.Tags).join(other).collect.foreach(println)
   }
 
   def rightOuterJoin = {
     println("> val other = sc.parallelize(Array(\"row1\" -> \"Moo\", \"row2\" -> \"Foo\", \"row3\" -> \"Bar\"))")
     val other = sc.parallelize(Array("row1" -> "Moo", "row2" -> "Foo", "row3" -> "Bar"))
-    println("> table.select(Tags).rightOuterJoin(other).collect.foreach(println)")
-    table.select(Tags).rightOuterJoin(other).collect.foreach(println)
+    println("> table.select(table.Tags).rightOuterJoin(other).collect.foreach(println)")
+    table.select(table.Tags).rightOuterJoin(other).collect.foreach(println)
   }
 
 }

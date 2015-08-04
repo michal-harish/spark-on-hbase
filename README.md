@@ -94,3 +94,4 @@ You can then run the demo appliation as a shell:
 - Write more comprehensive tutorial, generating larger table, writing a distributed algorithm over one column family and bulk-loading the result mutation into the second column family.
 - Add implicit Ordering[K] for all HBaseRDD representations since HBase is ordered by definition
 - Refactor for enabling forks and finish off the graph demo which currently doesn't really work
+- investigate table.rdd.mapValues(Tags).collect.foreach(println) => WARN ClosureCleaner: Expected a closure; got org.apache.spark.hbase.examples.simple.HBaseTableSimple$$anon$2, while table.select(Tags) works fine
