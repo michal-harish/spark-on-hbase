@@ -68,7 +68,7 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   private def rdd[V](valueMapper: (Result) => V,
                      consistency: Consistency, minStamp: Long, maxStamp: Long, columns: String*): HBaseRDD[K, V] = {
-    new HBaseRDD[K, V](sc, tableNameAsString, consistency, minStamp, maxStamp, null, columns: _*) {
+    new HBaseRDD[K, V](sc, tableNameAsString, consistency, minStamp, maxStamp, columns: _*) {
       override def bytesToKey = HBaseTable.this.bytesToKey
 
       override def keyToBytes = HBaseTable.this.keyToBytes

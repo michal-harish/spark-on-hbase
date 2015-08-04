@@ -292,11 +292,11 @@ with AGraph[HE] {
       edgeSeqBuilder.result
     }
     (if (allSpaces) {
-      rdd(OLDEST_TIMESTAMP, maxStamp, "N")
+      rdd(minStamp, maxStamp, "N")
     } else {
-      rdd(keySpaceCode, OLDEST_TIMESTAMP, maxStamp, "N")
+      rdd(keySpaceCode, minStamp, maxStamp, "N")
     })
-      .mapValues(CFREdge1S)
+      .mapValues(CFREdge1S) //FIXME this invokes incorrectly the HBaseRDDFunctions.mapValues
   }
 
 

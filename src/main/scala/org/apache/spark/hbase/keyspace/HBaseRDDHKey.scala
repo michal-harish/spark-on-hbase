@@ -2,10 +2,11 @@ package org.apache.spark.hbase.keyspace
 
 import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.HConstants._
+import org.apache.hadoop.hbase.filter.FuzzyRowFilter
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.HBaseRDD
 import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
-
+import scala.collection.JavaConverters._
 
 
 /**
@@ -34,7 +35,7 @@ class HBaseRDDHKey(@transient private val sc: SparkContext
                , columns: String*
                 )(implicit reg: HKSREG)
   extends HBaseRDD[HKey, Result](sc, tableNameAsString, consistency,
-    minStamp, maxStamp, (HKeySpace(keySpace).allocate(0), Array[Byte](1, 1, 1, 1, 0, 0)), columns:_*) {
+    minStamp, maxStamp, columns:_*) {
 
   def this(sc: SparkContext, tableNameAsString: String, columns: String*)(implicit reg: HKSREG)
   = this(sc, tableNameAsString, Consistency.STRONG, -1.toShort, OLDEST_TIMESTAMP, LATEST_TIMESTAMP, columns: _*)
@@ -54,4 +55,8 @@ class HBaseRDDHKey(@transient private val sc: SparkContext
 
   override def resultToValue = (row: Result) => row
 
+  override def configureRegionScan(scan :Scan) = {
+    val fuzzyRowfilter = new org.apache.hadoop.hbase.util.Pair(HKeySpace(keySpace).allocate(0), Array[Byte](1, 1, 1, 1, 0, 0))
+    scan.setFilter(new FuzzyRowFilter(List(fuzzyRowfilter).asJava))
+  }
 }

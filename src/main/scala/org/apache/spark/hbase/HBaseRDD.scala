@@ -6,8 +6,6 @@ import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{HBaseConfiguration, HConstants, TableName}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import scala.collection.JavaConverters._
-import org.apache.hadoop.hbase.filter.{FuzzyRowFilter, Filter}
 import org.apache.spark._
 
 import scala.reflect.ClassTag
@@ -21,7 +19,6 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
                               , val consistency: Consistency
                               , val minStamp: Long
                               , val maxStamp: Long
-                              , val fuzzyFilter: (Array[Byte], Array[Byte])
                               , val columns: String*) extends RDD[(K, V)](sc, Nil) {
 
   @transient private val tableName = TableName.valueOf(tableNameAsString)
@@ -43,8 +40,12 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
 
   def resultToValue: Result => V
 
+  protected def configureRegionScan(scan: Scan) = {
+    //RDDs derived from HBaseRDD can use this to add server-side filters etc.
+  }
+
   def mapResultRDD[V](resultMapper: (Result) => V, columns: String*) = {
-    new HBaseRDD[K,V](sc, tableNameAsString, consistency, minStamp, maxStamp, null, columns: _*) {
+    new HBaseRDD[K,V](sc, tableNameAsString, consistency, minStamp, maxStamp, columns: _*) {
       override def bytesToKey = HBaseRDD.this.bytesToKey
 
       override def keyToBytes: (K) => Array[Byte] = HBaseRDD.this.keyToBytes
@@ -121,9 +122,7 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
     if (minStamp != HConstants.OLDEST_TIMESTAMP || maxStamp != HConstants.LATEST_TIMESTAMP) {
       scan.setTimeRange(minStamp, maxStamp)
     }
-    if (fuzzyFilter != null) {
-      scan.setFilter(new FuzzyRowFilter(List(new org.apache.hadoop.hbase.util.Pair(fuzzyFilter._1, fuzzyFilter._2)).asJava))
-    }
+    configureRegionScan(scan)
     scan
   }
 
@@ -131,7 +130,7 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
 
 object HBaseRDD {
 
-  implicit def hBaseRddToPairRDDFunctions[K, V](rdd: HBaseRDD[K, V])
+  implicit def hBaseRddToPairRDDFunctions[K, V, H](rdd: HBaseRDD[K, V])
     (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null): HBaseRDDFunctions[K, V] = {
     new HBaseRDDFunctions[K, V](rdd)
   }
@@ -142,7 +141,7 @@ object HBaseRDD {
              minStamp: Long,
              maxStamp: Long,
              columns: String*)
-  = new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, consistency, minStamp, maxStamp, null, columns:_*) {
+  = new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, consistency, minStamp, maxStamp, columns:_*) {
     override def bytesToKey = (bytes: Array[Byte]) => bytes
 
     override def resultToValue = (result: Result) => result
