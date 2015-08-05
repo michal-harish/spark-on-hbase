@@ -111,7 +111,23 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
   def update[V](f: HBaseFunction[V], u: RDD[(K,V)]) = {
     val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
-    //f.applyInverse()
+    u.partitionBy(partitioner).foreachPartition(partition => {
+      val connection = ConnectionFactory.createConnection(broadCastConf.value)
+      try {
+        val table = connection.getBufferedMutator(TableName.valueOf(tableNameAsString))
+        partition.foreach {
+          case (key, value) => {
+            val put = new Put(keyToBytes(key))
+            put.setDurability(Durability.SKIP_WAL)
+            f.applyInverse(value, put)
+            table.mutate(put)
+          }
+        }
+        table.close
+      } finally {
+        connection.close
+      }
+    })
   }
 
 
