@@ -6,8 +6,8 @@ package org.apache.spark.hbase
 
 import org.apache.hadoop.hbase.KeyValue
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.hbase.keyspace.HKey
-import org.apache.spark.{HashPartitioner, Partitioner}
+import org.apache.spark.hbase.keyspace.Key
+import org.apache.spark.Partitioner
 
 class RegionPartitioner(val numRegions: Int) extends Partitioner {
 
@@ -34,10 +34,10 @@ class RegionPartitioner(val numRegions: Int) extends Partitioner {
   override def getPartition(key: Any): Int = {
     key match {
       case keyValue: KeyValue => findRegion(keyValue.getRowArray, keyValue.getRowOffset, keyValue.getRowLength)
-      case key: HKey => findRegion(key.bytes)
+      case key: Key => findRegion(key.bytes)
       case a: Array[Byte] if a.length > 0 => findRegion(a)
       case s: String if (s.length > 0) => findRegion(ByteUtils.reverse(s.getBytes))
-      case _ => throw new IllegalArgumentException("RegionPartitioner only supports KeyValue, HKey, String and Array[Byte] keys")
+      case _ => throw new IllegalArgumentException("RegionPartitioner only supports KeyValue, Key, String and Array[Byte] keys")
     }
   }
 

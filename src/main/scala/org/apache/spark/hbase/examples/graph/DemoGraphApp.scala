@@ -17,9 +17,9 @@ class DemoGraphApp(sc: SparkContext) {
 
   implicit val context = sc
 
-  implicit val DemoHKeySapceReg = Map(
+  implicit val DemoKeySapceReg = Map(
     new DemoKeySpace("d").keyValue,
-    new HKeySpaceUUID("u").keyValue
+    new KeySpaceUUID("u").keyValue
   )
 
   val graph = new HGraphTable(context, "demo-graph")
@@ -39,8 +39,8 @@ class DemoGraphApp(sc: SparkContext) {
 
   def generate = {
     val subnet: graph.NETWORK = graph.fromPairs(sc.parallelize(Array(
-      (HKey("u", "83bd04a6-9219-4814-be12-bfb14476b030"), (HKey("u", "ab79a709-d6b5-4d30-bf20-dc826580cbd1"), HE("DT1", 1.0))),
-      (HKey("u", "83bd04a6-9219-4814-be12-bfb14476b030"), (HKey("d", "e7fa8bc9a44d788789b854f5c62529"), HE("P1", 0.5)))
+      (Key("u", "83bd04a6-9219-4814-be12-bfb14476b030"), (Key("u", "ab79a709-d6b5-4d30-bf20-dc826580cbd1"), HE("DT1", 1.0))),
+      (Key("u", "83bd04a6-9219-4814-be12-bfb14476b030"), (Key("d", "e7fa8bc9a44d788789b854f5c62529"), HE("P1", 0.5)))
     )))
     graph.updateNet(subnet)
   }
@@ -48,14 +48,14 @@ class DemoGraphApp(sc: SparkContext) {
    * From an adjacency lists represented as coma-separated ids to a redundant NETWORK
    */
   final def fromTextList(he: HE, textFile: RDD[String], keySpace: String): graph.NETWORK = {
-    fromList(he, textFile.map(_.split(",").map(HKey(keySpace, _)).toSeq))
+    fromList(he, textFile.map(_.split(",").map(Key(keySpace, _)).toSeq))
   }
 
   /**
    * From undriected adjacency lists creates a redundant directed network graph
    * in: RDD[(id1,id2)]
    */
-  final def fromList(he: HE, in: RDD[Seq[HKey]]): graph.NETWORK = {
+  final def fromList(he: HE, in: RDD[Seq[Key]]): graph.NETWORK = {
     graph.deduplicate(
       in.flatMap(a => {
         val sortedEdges = a.sorted.map(v => (v, he))

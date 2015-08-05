@@ -31,13 +31,6 @@ class DemoSimpleApp(sc: SparkContext) {
     println(" rightOuterJoin - example rightOuterJoin")
   }
 
-  /* TODO table[K].select(Tags).filter(keyspace == "d").filter(Propensity > 0.5) - push the filter down to hbase server side, e.g.
-    * filter(filter(select)): HBaseRDD
-    * --------------------------------------------------------
-    * the resulting scan is therefore is configured at 3 levels
-    *
-    */
-
   def put = {
     println("Updating `demo-simple` column family `F` - Features")
 

@@ -1,7 +1,7 @@
 package org.apache.spark.hbase.examples.graph
 
 import org.apache.spark.hbase.ByteUtils
-import org.apache.spark.hbase.keyspace.{HKeySpace, KeySerdeUUIDNumeric}
+import org.apache.spark.hbase.keyspace.{KeySpace, KeySerdeUUIDNumeric}
 
 /**
  * Created by mharis on 23/07/15.
@@ -9,7 +9,7 @@ import org.apache.spark.hbase.keyspace.{HKeySpace, KeySerdeUUIDNumeric}
  * It is a representation of UUID which I've seen in real world where the dashes and leading zeros are stripped away.
  */
 
-class DemoKeySpace(symbol: String)  extends HKeySpace(symbol) with KeySerdeUUIDNumeric {
+class DemoKeySpace(symbol: String)  extends KeySpace(symbol) with KeySerdeUUIDNumeric {
   override def asString(bytes: Array[Byte]): String = uuidToNumericString(bytes, 6).dropWhile(_ == '0')
   override def asBytes(id: String): Array[Byte] = {
     val bytes = allocate(16)

@@ -10,8 +10,8 @@ import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{Cell, CellUtil, HConstants}
 import org.apache.spark.hbase._
-import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
-import org.apache.spark.hbase.keyspace.{HBaseTableHKey, HKey, HKeySpace}
+import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
+import org.apache.spark.hbase.keyspace.{HBaseTableKS, Key, KeySpace}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Accumulator, SparkContext}
 
@@ -58,7 +58,7 @@ object HE extends Serializable {
     Short.MaxValue -> "RESERVED")
   val vendors2: Map[String, Short] = vendors.map(x => (x._2 -> x._1))
 
-  implicit def ordering[A <: (HKey, _)]: Ordering[A] = new Ordering[A] {
+  implicit def ordering[A <: (Key, _)]: Ordering[A] = new Ordering[A] {
     override def compare(x: A, y: A): Int = x._1.compareTo(y._1)
   }
 
@@ -95,7 +95,7 @@ object HE extends Serializable {
 }
 
 
-class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: HKSREG) extends HBaseTableHKey(sc, tableName: String)
+class HGraphTable(sc: SparkContext, tableName: String)(implicit reg: KSREG) extends HBaseTableKS(sc, tableName: String)
 with AGraph[HE] {
 
   @transient
@@ -128,13 +128,13 @@ with AGraph[HE] {
   }
 
   val CFREdges = (row: Result) => {
-    val edgeSeqBuilder = Seq.newBuilder[(HKey, HE)]
+    val edgeSeqBuilder = Seq.newBuilder[(Key, HE)]
     val scanner = row.cellScanner
     val cfNet = Bytes.toBytes("N")
     while (scanner.advance) {
       val kv = scanner.current
       if (Bytes.equals(kv.getFamilyArray, kv.getFamilyOffset, kv.getFamilyLength, cfNet, 0, cfNet.length)) {
-        val key = HKey(CellUtil.cloneQualifier(kv))
+        val key = Key(CellUtil.cloneQualifier(kv))
         val ts = kv.getTimestamp
         edgeSeqBuilder += ((key, HE.applyVersion(CellUtil.cloneValue(kv), ts)))
       }
@@ -171,7 +171,7 @@ with AGraph[HE] {
 
   //TODO rebuild Features with ResultFunction
   def rddFeatures: LAYER[FEATURES] = {
-    rdd(HKeySpace("d"), "F").mapValues(CFRFeatures)
+    rdd(KeySpace("d")).select("F").mapValues(CFRFeatures)
   }
 
   def rddFeatures[T](feature: String)(implicit tag: ClassTag[T]): LAYER[T] = {
@@ -182,7 +182,7 @@ with AGraph[HE] {
       case java.lang.Double.TYPE => (row: Result) => Bytes.toDouble(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
       case _ => throw new UnsupportedOperationException(tag.runtimeClass.toString)
     }
-    val filtered = rdd((result: Result) => result, HKeySpace("d"), "F")
+    val filtered = rdd((result: Result) => result, KeySpace("d")).select("F")
       .filter(_._2.containsNonEmptyColumn(cfFeatures, fFeature))
     filtered.mapPartitions(rows => rows.map({ case (key, values) => (key, t(values)) }), preservesPartitioning = true)
   }
@@ -211,7 +211,7 @@ with AGraph[HE] {
   }
 
   def copyNet(dest: HGraphTable, closeContextOnExit: Boolean = false): Long = {
-    val update: RDD[(HKey, EDGES)] = rddNet
+    val update: RDD[(Key, EDGES)] = rddNet
       .leftOuterJoin(dest.rddNet)
       .mapValues({ case (left, right) => right match {
       case None => left
@@ -230,7 +230,7 @@ with AGraph[HE] {
       while (scanner.advance) numEdges += 1L
       numEdges
     }
-    rdd(CFRNumEdges, "N").filter(OLDEST_TIMESTAMP, beforeTimestamp)
+    rdd(CFRNumEdges).select("N").filter(OLDEST_TIMESTAMP, beforeTimestamp)
   }
 
   /**
@@ -251,19 +251,19 @@ with AGraph[HE] {
    * rddPool Returns a POOL of all Row keys in the given key space and their maximum connected Row in the same key space
    */
   def rddPool(keySpace: String): POOL = {
-    val keySpaceCode = HKeySpace(keySpace)
+    val keySpaceCode = KeySpace(keySpace)
     val CFRMaxKey1Space = (row: Result) => {
       val scanner = row.cellScanner
       var selectedCell: Cell = null
       while (scanner.advance) {
         val kv = scanner.current
-        if (HKeySpace(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength) == keySpaceCode) {
+        if (KeySpace(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength) == keySpaceCode) {
           selectedCell = kv
         }
       }
-      HKey(if (selectedCell == null) row.getRow else CellUtil.cloneQualifier(selectedCell))
+      Key(if (selectedCell == null) row.getRow else CellUtil.cloneQualifier(selectedCell))
     }
-    rdd(CFRMaxKey1Space, keySpaceCode, "N")
+    rdd(CFRMaxKey1Space, keySpaceCode).select("N")
   }
 
   /**
@@ -273,15 +273,15 @@ with AGraph[HE] {
   def rddNet: NETWORK = rddNet("*")
 
   def rddNet(keySpace: String): NETWORK = {
-    val keySpaceCode = HKeySpace(keySpace)
+    val keySpaceCode = KeySpace(keySpace)
     val allSpaces = keySpace == "*"
     val CFREdge1S = (row: Result) => {
-      val edgeSeqBuilder = Seq.newBuilder[(HKey, HE)]
+      val edgeSeqBuilder = Seq.newBuilder[(Key, HE)]
       val scanner = row.cellScanner
       while (scanner.advance) {
         val kv = scanner.current
-        if (allSpaces || HKeySpace(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength) == keySpaceCode) {
-          val key = HKey(CellUtil.cloneQualifier(kv))
+        if (allSpaces || KeySpace(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength) == keySpaceCode) {
+          val key = Key(CellUtil.cloneQualifier(kv))
           val ts = kv.getTimestamp
           edgeSeqBuilder += ((key, HE.applyVersion(CellUtil.cloneValue(kv), ts)))
         }
@@ -289,9 +289,9 @@ with AGraph[HE] {
       edgeSeqBuilder.result
     }
     (if (allSpaces) {
-      rdd(CFREdge1S, "N")
+      rdd(CFREdge1S).select("N")
     } else {
-      rdd(CFREdge1S, keySpaceCode, "N")
+      rdd(CFREdge1S, keySpaceCode).select("N")
     })
   }
 
@@ -340,17 +340,17 @@ with AGraph[HE] {
 //    }
 //  }
 
-//  def remove(ids: HKey*)(implicit context: SparkContext): Long = {
-//    val j = new HBaseJoinMultiGet[EDGES, HKey](1000, cfNet)
-//    delete(cfNet, j(CFREdges, context.parallelize(ids.map(x => (x, null.asInstanceOf[HKey]))))
+//  def remove(ids: Key*)(implicit context: SparkContext): Long = {
+//    val j = new HBaseJoinMultiGet[EDGES, Key](1000, cfNet)
+//    delete(cfNet, j(CFREdges, context.parallelize(ids.map(x => (x, null.asInstanceOf[Key]))))
 //      .flatMap { case (key, (edges, right)) => edges.map(e => (e._1, Set(key.bytes))) :+(key, Set(null.asInstanceOf[Array[Byte]])) }
 //      .reduceByKey(_ ++ _).mapValues(_.toSeq)
 //    )
 //  }
 //
-//  def remove[T: ClassTag](ids: RDD[(HKey, T)],  completeAsync: Boolean = true): Long = {
-//    val j = new HBaseJoinMultiGet[EDGES, HKey](1000, cfNet)
-//    removeNet(j(CFREdges, ids.mapValues(x => null.asInstanceOf[HKey])).mapValues(_._1), completeAsync)
+//  def remove[T: ClassTag](ids: RDD[(Key, T)],  completeAsync: Boolean = true): Long = {
+//    val j = new HBaseJoinMultiGet[EDGES, Key](1000, cfNet)
+//    removeNet(j(CFREdges, ids.mapValues(x => null.asInstanceOf[Key])).mapValues(_._1), completeAsync)
 //  }
 
   def removeNet(rdd: NETWORK, completeAsync: Boolean = true): Long = {
@@ -366,9 +366,9 @@ with AGraph[HE] {
 //   * - it the RDD immutability and resiliency however
 //   */
 //  //---------(Key--(PrevState,-----Pending-Inbox)))
-//  type BSP = (HKey, (Option[EDGES], (EDGES, EDGES)))
+//  type BSP = (Key, (Option[EDGES], (EDGES, EDGES)))
 //  //----------------[(Key, (State, Update)]
-//  type BSP_OUT = RDD[(HKey, (EDGES, EDGES))]
+//  type BSP_OUT = RDD[(Key, (EDGES, EDGES))]
 //  type BSP_RESULT = (BSP_OUT, STATS, HISTORY)
 //
 //  def incrementalNetBSP(adj: NETWORK, numSupersteps: Int = 9, multiGetSize: Int = 1000): BSP_RESULT = {

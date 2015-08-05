@@ -1,30 +1,30 @@
 package org.apache.spark.hbase.keyspace
 
 import org.apache.spark.hbase.ByteUtils
-import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
+import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
 
-package object HKeySpaceRegistry {
-  type HKSREG = Map[Short, HKeySpace]
+package object KeySpaceRegistry {
+  type KSREG = Map[Short, KeySpace]
 }
 
-object HKeySpace extends Serializable {
+object KeySpace extends Serializable {
   def apply(id: Array[Byte], offset: Int, length: Int): Short = {
     (((id(offset + 4) & 0xff) << 8) + (id(offset + 5) & 0xff)).toShort
   }
 
   def apply(keySpace: String): Short = keySpace.hashCode.toShort
 
-  def apply(keySpace: Short)(implicit reg: HKSREG): HKeySpace = {
+  def apply(keySpace: Short)(implicit reg: KSREG): KeySpace = {
     if (exists(keySpace)) reg(keySpace) else throw new IllegalArgumentException
   }
 
-  def exists(keySpace: Short)(implicit reg: HKSREG): Boolean = {
+  def exists(keySpace: Short)(implicit reg: KSREG): Boolean = {
     reg.contains(keySpace)
   }
 
 }
 
-abstract class HKeySpace(val symbol: String) extends Serializable {
+abstract class KeySpace(val symbol: String) extends Serializable {
   val i = symbol.hashCode.toShort
 
   def asBytes(id: String): Array[Byte]
@@ -40,10 +40,10 @@ abstract class HKeySpace(val symbol: String) extends Serializable {
     bytes
   }
 
-  def keyValue: (Short, HKeySpace) = (i -> this)
+  def keyValue: (Short, KeySpace) = (i -> this)
 }
 
-class HKeySpaceUUID(symbol: String) extends HKeySpace(symbol) with KeySerdeUUID {
+class KeySpaceUUID(symbol: String) extends KeySpace(symbol) with KeySerdeUUID {
   override def asString(bytes: Array[Byte]): String = uuidToString(bytes, 6)
 
   override def asBytes(id: String): Array[Byte] = {
@@ -54,7 +54,7 @@ class HKeySpaceUUID(symbol: String) extends HKeySpace(symbol) with KeySerdeUUID 
   }
 }
 
-class HKeySpaceUUIDNumeric(symbol: String) extends HKeySpace(symbol) with KeySerdeUUIDNumeric {
+class KeySpaceUUIDNumeric(symbol: String) extends KeySpace(symbol) with KeySerdeUUIDNumeric {
   override def asString(bytes: Array[Byte]): String = uuidToNumericString(bytes, 6)
 
   override def asBytes(id: String): Array[Byte] = {
@@ -66,7 +66,7 @@ class HKeySpaceUUIDNumeric(symbol: String) extends HKeySpace(symbol) with KeySer
 }
 
 
-class HKeySpaceString(symbol: String) extends HKeySpace(symbol) with KeySerdeString {
+class KeySpaceString(symbol: String) extends KeySpace(symbol) with KeySerdeString {
   override def asString(bytes: Array[Byte]): String = bytesToString(bytes, 6, bytes.length)
 
   override def asBytes(id: String): Array[Byte] = {
@@ -77,7 +77,7 @@ class HKeySpaceString(symbol: String) extends HKeySpace(symbol) with KeySerdeStr
   }
 }
 
-class HKeySpaceLong(symbol: String) extends HKeySpace(symbol) with KeySerdeLong {
+class KeySpaceLong(symbol: String) extends KeySpace(symbol) with KeySerdeLong {
   override def asString(bytes: Array[Byte]): String = longBytesToString(bytes, 6)
 
   override def asBytes(id: String): Array[Byte] = {
@@ -88,7 +88,7 @@ class HKeySpaceLong(symbol: String) extends HKeySpace(symbol) with KeySerdeLong 
   }
 }
 
-class HKeySpaceLongPositive(symbol: String) extends HKeySpace(symbol) with KeySerdeLongPositive {
+class KeySpaceLongPositive(symbol: String) extends KeySpace(symbol) with KeySerdeLongPositive {
   override def asString(bytes: Array[Byte]): String = longPositiveBytesToString(bytes, 6)
 
   override def asBytes(id: String): Array[Byte] = {
@@ -99,7 +99,7 @@ class HKeySpaceLongPositive(symbol: String) extends HKeySpace(symbol) with KeySe
   }
 }
 
-class HKeySpaceHEX(symbol: String) extends HKeySpace(symbol) with KeySerdeHEX {
+class KeySpaceHEX(symbol: String) extends KeySpace(symbol) with KeySerdeHEX {
   override def asBytes(id: String): Array[Byte] = {
     if (id.length % 2 != 0) throw new IllegalArgumentException
     val bytes = allocate(id.length / 2)

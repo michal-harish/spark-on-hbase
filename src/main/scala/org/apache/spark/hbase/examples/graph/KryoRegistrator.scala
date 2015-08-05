@@ -5,12 +5,12 @@ import org.apache.spark.hbase.keyspace._
 
 class KryoRegistrator extends org.apache.spark.serializer.KryoRegistrator {
   override def registerClasses(kryo: Kryo) {
-    kryo.register(classOf[HKeySpace])
-    kryo.register(classOf[HKeySpaceUUID])
-    kryo.register(classOf[HKeySpaceUUIDNumeric])
-    kryo.register(classOf[HKeySpaceLong])
-    kryo.register(classOf[HKeySpaceString])
-    kryo.register(classOf[HKey])
+    kryo.register(classOf[KeySpace])
+    kryo.register(classOf[KeySpaceUUID])
+    kryo.register(classOf[KeySpaceUUIDNumeric])
+    kryo.register(classOf[KeySpaceLong])
+    kryo.register(classOf[KeySpaceString])
+    kryo.register(classOf[Key])
     kryo.register(classOf[HE])
   }
 }

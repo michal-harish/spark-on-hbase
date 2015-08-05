@@ -1,7 +1,7 @@
 package org.apache.spark.hbase.examples.graph
 
 import org.apache.spark.hbase.RegionPartitioner
-import org.apache.spark.hbase.keyspace.HKey
+import org.apache.spark.hbase.keyspace.Key
 import org.apache.spark.rdd.RDD
 import org.apache.spark.rdd.RDD.{rddToOrderedRDDFunctions, rddToPairRDDFunctions}
 import org.apache.spark.storage.StorageLevel._
@@ -22,19 +22,19 @@ trait AGraph[PROPS <: Props[PROPS]] {
   type HISTORY = scala.collection.mutable.MutableList[RDD[_]]
 
   /**
-   * LAYER is an abstract concept which is represented by a Key-Value Spark RDD with fixed key type - HKey - and
+   * LAYER is an abstract concept which is represented by a Key-Value Spark RDD with fixed key type - Key - and
    * unspecified value type.
    * A general Graph may consist of several layers and as long as the elements in each are keyed by the same type the
    * set of layers can be viewed and analysied as a single graph.
    */
-  type LAYER[X] = RDD[(HKey, X)]
+  type LAYER[X] = RDD[(Key, X)]
 
   /**
-   * NETWORK is a LAYER which represents the structure of the graph. It is keyed by HKey (as any other LAYER) where each
+   * NETWORK is a LAYER which represents the structure of the graph. It is keyed by Key (as any other LAYER) where each
    * value is a sequence of outgoing edges
    */
 
-  type EDGE = (HKey, PROPS)
+  type EDGE = (Key, PROPS)
   type EDGES = Seq[EDGE]
   // TODO consider hashmap instead of sequence because of frequent .exists operations
   type NETWORK = LAYER[EDGES]
@@ -42,9 +42,9 @@ trait AGraph[PROPS <: Props[PROPS]] {
   type PAIRS = LAYER[EDGE]
 
   /**
-   * POOL - is a list of IDs mapped to another list of IDs, for disconnected pool both HKey(s) in the tuple are same
+   * POOL - is a list of IDs mapped to another list of IDs, for disconnected pool both Key(s) in the tuple are same
    */
-  type POOL = LAYER[HKey]
+  type POOL = LAYER[Key]
 
   def minimize(net: NETWORK, keySpace: Short): NETWORK = net.filter(_._1.keySpace == keySpace).mapValues(_.filter(_._1.keySpace == keySpace))
 
@@ -53,7 +53,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
   /**
    * converts a network into a pool of pairs
    */
-  def flatten(net: NETWORK): POOL = net.map { case (key, edges) => (key, HKey.highest(key, edges.map(_._1))) }
+  def flatten(net: NETWORK): POOL = net.map { case (key, edges) => (key, Key.highest(key, edges.map(_._1))) }
 
   /**
    * generic histogram function
@@ -119,7 +119,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
 
   /**
    * combines all occurrences of the same vertex id into a network of unique vertices with combined and deduplicated edges
-   * merge-sort optimized implementation of (a ++ b).distinct.sortWith(HKey.comparator)
+   * merge-sort optimized implementation of (a ++ b).distinct.sortWith(Key.comparator)
    * WARNING: because it is a merge sort, the individual edge sequences are expected to be already sorted
    * the input net RDD doesn't have to be sorted by key but the EDGES within each row MUST be sorted
    */
@@ -176,8 +176,8 @@ trait AGraph[PROPS <: Props[PROPS]] {
     net.repartitionAndSortWithinPartitions(partitioner)
       .mapPartitions(part => {
       val forward = part.buffered
-      new Iterator[(HKey, EDGES)] {
-        var current: Option[(HKey, EDGES)] = None
+      new Iterator[(Key, EDGES)] {
+        var current: Option[(Key, EDGES)] = None
 
         override def hasNext: Boolean = {
           current match {
@@ -187,7 +187,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
           }
         }
 
-        override def next(): (HKey, EDGES) = {
+        override def next(): (Key, EDGES) = {
           if (current.isEmpty) throw new NoSuchElementException
           val result = current.get
           current = None
@@ -196,7 +196,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
 
         private def loadAndMergeNextGroup: Boolean = {
           if (forward.hasNext) {
-            val key: HKey = forward.head._1
+            val key: Key = forward.head._1
             val group = mutable.MutableList[EDGES]()
             do {
               group += forward.head._2
@@ -235,16 +235,16 @@ trait AGraph[PROPS <: Props[PROPS]] {
     users.leftOuterJoin(net, partitioner).flatMap({ case (key, (maxEdge, netEdges)) => {
       netEdges match {
         case Some(edges) if (edges.length > 0) => {
-          val max = HKey.highest(key, edges.map(_._1))
+          val max = Key.highest(key, edges.map(_._1))
           edges.map(edge => (edge._1, max)) :+(key, max)
         }
         case _ => Seq((key, maxEdge))
       }
     }
-    }).reduceByKey(partitioner, (a, b) => HKey.higher(a, b))
+    }).reduceByKey(partitioner, (a, b) => Key.higher(a, b))
   }
 
-  final def profile[X](users: POOL, profile: LAYER[X])(implicit partitioner: RegionPartitioner): RDD[(HKey, (HKey, X))] = {
+  final def profile[X](users: POOL, profile: LAYER[X])(implicit partitioner: RegionPartitioner): RDD[(Key, (Key, X))] = {
     users.join(profile, partitioner)
   }
 
@@ -252,7 +252,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
    * expand - expands the pool of ids using the network's connectivity into a new list
    * and do a straight join on available profile
    */
-  final def expand[X](net: NETWORK, pool: POOL, profile: LAYER[X])(implicit partitioner: RegionPartitioner): RDD[(HKey, (HKey, X))] = {
+  final def expand[X](net: NETWORK, pool: POOL, profile: LAYER[X])(implicit partitioner: RegionPartitioner): RDD[(Key, (Key, X))] = {
     expand(net, pool).join(profile, partitioner)
   }
 
@@ -262,7 +262,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
    * but unlike the expand it then joins the expanded profile on the original unexpanded pool
    */
   final def innerExpand[X](net: NETWORK, pool: POOL, profile: LAYER[X] /*, combiner: (X,X) => X*/)
-                          (implicit t: ClassTag[X], partitioner: RegionPartitioner): RDD[(HKey, (HKey, X))] = {
+                          (implicit t: ClassTag[X], partitioner: RegionPartitioner): RDD[(Key, (Key, X))] = {
     val exp: POOL = expand(net, pool)
     exp.collect.foreach(x => println(s"EXPANDED POOL ${x}"))
     val expandedProfile = exp.join(profile, partitioner)
@@ -283,16 +283,16 @@ trait AGraph[PROPS <: Props[PROPS]] {
   /**
    * returns a triplet of (#groups, #vertices, ∑X) as an aggregate of the overlay computed by profile or expand
    */
-  final def aggregate(overlay: RDD[(HKey, (HKey, Long))]): (Long, Long, Long) = aggregate(overlay, (a: Long, b: Long) => a + b)
+  final def aggregate(overlay: RDD[(Key, (Key, Long))]): (Long, Long, Long) = aggregate(overlay, (a: Long, b: Long) => a + b)
 
-  final def aggregate[X](overlay: RDD[(HKey, (HKey, X))], sum: (X, X) => X): (Long, Long, X) = {
+  final def aggregate[X](overlay: RDD[(Key, (Key, X))], sum: (X, X) => X): (Long, Long, X) = {
     overlay.map { case (key, (maxKey, x)) => (maxKey, (1L, x)) }
       .reduceByKey((a, b) => (a._1 + b._1, sum(a._2, b._2)))
       .map { case (maxKey, (numCookies, x)) => (1L, numCookies, x) }
       .reduce((a, b) => (a._1 + b._1, a._2 + b._2, sum(a._3, b._3)))
   }
 
-  final def aggregate[X, Y](overlay: RDD[(HKey, (HKey, X))]
+  final def aggregate[X, Y](overlay: RDD[(Key, (Key, X))]
                             , combiner: (X, X) => X, converter: (X) => Y, aggregator: (Y, Y) => Y): (Long, Long, Y) = {
     overlay.map { case (key, (maxKey, x)) => (maxKey, (1L, x)) }
       .reduceByKey((a, b) => (a._1 + b._1, combiner(a._2, b._2)))

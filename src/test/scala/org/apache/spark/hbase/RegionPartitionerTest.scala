@@ -2,7 +2,7 @@ package org.apache.spark.hbase
 
 import java.util.UUID
 
-import org.apache.spark.hbase.keyspace.HKeySpaceRegistry._
+import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
 import org.apache.spark.hbase.keyspace._
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -11,9 +11,9 @@ import org.scalatest.{FlatSpec, Matchers}
  */
 class RegionPartitionerTest extends FlatSpec with Matchers {
 
-  implicit val TestHKeySpaceReg: HKSREG = Map(
-    new HKeySpaceUUID("test").keyValue,
-    new HKeySpaceString("d").keyValue
+  implicit val TestKeySpaceReg: KSREG = Map(
+    new KeySpaceUUID("test").keyValue,
+    new KeySpaceString("d").keyValue
   )
 
 
@@ -38,9 +38,9 @@ class RegionPartitionerTest extends FlatSpec with Matchers {
   val p = new RegionPartitioner(numRegions)
 
 
-  val v0 = HKey("test", "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
-  val d0 = HKey("d", "CASEAS000000000")
-  val d1 = HKey("d", "CASEASfffffffff")
+  val v0 = Key("test", "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
+  val d0 = Key("d", "CASEAS000000000")
+  val d1 = Key("d", "CASEASfffffffff")
 
   p.getPartition(v0) should be(496)
   p.getPartition(v0.bytes) should be(496)
@@ -60,7 +60,7 @@ class RegionPartitionerTest extends FlatSpec with Matchers {
   print("...")
   val t = System.currentTimeMillis()
   for (i <- (1 to n)) {
-    val key = HKey("test", UUID.randomUUID.toString)
+    val key = Key("test", UUID.randomUUID.toString)
     val part = p.getPartition(key)
     if (hist.contains(part)) hist += (part -> (hist(part) + 1)) else hist += (part -> 1)
   }

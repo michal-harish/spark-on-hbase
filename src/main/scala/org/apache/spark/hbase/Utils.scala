@@ -12,7 +12,7 @@ import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{HTableDescriptor, HBaseConfiguration, HColumnDescriptor, TableName}
 import org.apache.hadoop.io.{BytesWritable, NullWritable}
 import org.apache.spark.{SerializableWritable, SparkContext}
-import org.apache.spark.hbase.keyspace.HKey
+import org.apache.spark.hbase.keyspace.Key
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
 
@@ -244,7 +244,7 @@ object Utils {
    * Although we set spark serializer to kryo, the saveAsObject still outputs java serialized objects so
    * we provide our own method to dump the graph in kryo.
    */
-  final def saveAsKryo[T](rdd: RDD[(HKey, T)], path: String) = {
+  final def saveAsKryo[T](rdd: RDD[(Key, T)], path: String) = {
     val kryoSerializer = new KryoSerializer(rdd.context.getConf)
     rdd.mapPartitions(partition => partition.grouped(1000).map(_.toArray))
       .map(splitArray => {
@@ -259,14 +259,14 @@ object Utils {
     }).saveAsSequenceFile(path)
   }
 
-  final def loadKryo[T: ClassTag](sc: SparkContext, path: String)(implicit ct: ClassTag[T]): RDD[(HKey, T)] = {
+  final def loadKryo[T: ClassTag](sc: SparkContext, path: String)(implicit ct: ClassTag[T]): RDD[(Key, T)] = {
     val kryoSerializer = new KryoSerializer(sc.getConf)
     sc.sequenceFile(path, classOf[NullWritable], classOf[BytesWritable])
       .flatMap(x => {
       val kryo = kryoSerializer.newKryo()
       val input = new Input()
       input.setBuffer(x._2.getBytes)
-      kryo.readObject(input, classOf[Array[(HKey, T)]])
+      kryo.readObject(input, classOf[Array[(Key, T)]])
     })
   }
 

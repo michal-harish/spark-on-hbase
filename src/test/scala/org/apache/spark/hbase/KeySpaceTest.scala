@@ -2,7 +2,7 @@ package org.apache.spark.hbase
 
 import java.util.UUID
 
-import org.apache.spark.hbase.keyspace.HKeySpaceRegistry.HKSREG
+import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
 import org.apache.spark.hbase.keyspace._
 import org.scalatest.{Matchers, FlatSpec}
 
@@ -11,38 +11,38 @@ import scala.util.Random
 /**
  * Created by mharis on 23/07/15.
  */
-class HKeySpaceTest extends FlatSpec with Matchers {
+class KeySpaceTest extends FlatSpec with Matchers {
 
   val random = new Random
   val numPartitions = 32
   val partitioner = new RegionPartitioner(numPartitions)
 
-  implicit val TestHKeySpaceReg: HKSREG = Map(
-    new HKeySpaceLong("l").keyValue,
-    new HKeySpaceLongPositive("lp").keyValue,
-    new HKeySpaceUUID("u").keyValue
+  implicit val TestKeySpaceReg: KSREG = Map(
+    new KeySpaceLong("l").keyValue,
+    new KeySpaceLongPositive("lp").keyValue,
+    new KeySpaceUUID("u").keyValue
   )
 
-  behavior of "HKeySpaceLong"
+  behavior of "KeySpaceLong"
   it should "have even distribution when partitioned by RegionPartitioner" in {
-    val keys: Seq[HKey] = for (i <- (0 to 100000)) yield HKey("l", random.nextLong.toString)
+    val keys: Seq[Key] = for (i <- (0 to 100000)) yield Key("l", random.nextLong.toString)
     verifyEvenDistribution(keys)
   }
 
-  behavior of "HKeySpaceLongPositive"
+  behavior of "KeySpaceLongPositive"
   it should "have even distribution when partitioned by RegionPartitioner" in {
-    val keys: Seq[HKey] = for (i <- (0 to 100000)) yield HKey("lp", math.abs(random.nextLong).toString)
+    val keys: Seq[Key] = for (i <- (0 to 100000)) yield Key("lp", math.abs(random.nextLong).toString)
     verifyEvenDistribution(keys)
   }
 
-  behavior of "HKeySpaceUUID"
+  behavior of "KeySpaceUUID"
   it should "have even distribution when partitioned by RegionPartitioner" in {
 
-    val keys: Seq[HKey] = for (i <- (0 to 100000)) yield HKey("u", UUID.randomUUID.toString)
+    val keys: Seq[Key] = for (i <- (0 to 100000)) yield Key("u", UUID.randomUUID.toString)
     verifyEvenDistribution(keys)
   }
 
-  def verifyEvenDistribution(keys: Seq[HKey]) = {
+  def verifyEvenDistribution(keys: Seq[Key]) = {
     val histogram = new scala.collection.mutable.HashMap[Int, Int]()
     keys.foreach(key => {
       val partition = partitioner.getPartition(key)

@@ -50,9 +50,9 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   def bytesToKey: Array[Byte] => K
 
-  def rdd: HBaseRDD[K, Result] = rdd((result: Result) => result)
+  def rdd()(implicit k: ClassTag[K]): HBaseRDD[K, Result] = rdd((result: Result) => result)
 
-  protected def rdd[V](valueMapper: (Result) => V, columns: String*): HBaseRDD[K, V] = {
+  protected def rdd[V](valueMapper: (Result) => V): HBaseRDD[K, V] = {
     new HBaseRDD[K, V](sc, tableNameAsString, Nil) {
       override def bytesToKey = HBaseTable.this.bytesToKey
 
@@ -60,10 +60,6 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
       override def resultToValue = valueMapper
     }
-  }
-
-  def select(columns: String*)(implicit k: ClassTag[K]): HBaseRDD[K, Result] = {
-    rdd[Result]((result: Result) => result).select(columns:_*)
   }
 
   def select[F1: ClassTag](f1: ResultFunction[F1])(implicit k: ClassTag[K]): HBaseRDD[K, F1] = {
