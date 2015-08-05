@@ -13,7 +13,7 @@ which inherits all transformation methods from RDD[(K,V)] and has some special t
 - __`myTable.rdd.filter(Consistency)`__ - server-side scan filter for different levels of consistency required
 - __`myTable.rdd.filter(minStamp, maxStamp)`__ - server-side scan filter for hbase timestamp ranges
 - __`myTable.rdd.select(columnOrFamily1, columnOrFamily2, ...)`__ - server-side scan filter for selected columns or column families
-- __`myTable.rdd.join(other: RDD)`__ - uses a `HBaseJoin abstract function which is implemented in 2 versions, both resulting in a single-stage join regardless of partitioners used. One is for situations where the right table is very large portion of the left hbase table - `HBaseJoinRangeScan` and the other is for situtations where the right table is a small fraction of the left table - `HBaseJoinMultiGet`. (The mechanism for choosing between the types of join is not done, i.e. at the moment all the joins are mutli-get, see TODO below)
+- __`myTable.rdd.join(other: RDD)`__ - uses a `HBaseJoin` abstract function which is implemented in 2 versions, both resulting in a single-stage join regardless of partitioners used. One is for situations where the right table is very large portion of the left hbase table - `HBaseJoinRangeScan` and the other is for situtations where the right table is a small fraction of the left table - `HBaseJoinMultiGet`. (The mechanism for choosing between the types of join is not done, i.e. at the moment all the joins are mutli-get, see TODO below)
 - __`myTable.rdd.rightOuterJoin(other: RDD)`__ - uses the same optimized implementation as join but with rightOuterJoin result
 - __`myTable.rdd.fill(range: RDD)`__ - Fill is an additional functionality, similar to join except where the argument rdd is treated as to be 'updated' or 'filled-in' where the value of the Option is None - this is for highly iterative algorithms which start from a subset of HBase table and expand it in later iterations.
 
@@ -97,14 +97,16 @@ and column family 'C' which always has one column 'body' containing the content 
 
 ```
 val documents = new HBaseTable[UUID](sc, "my_documents_table") {
-
     override def keyToBytes = (key: UUID) => ByteUtils.UUIDToBytes(key)
     override def bytesToKey = (bytes: Array[Byte]) => ByteUtils.bytesToUUID(bytes)
+    
+    val C = Bytes.toBytes("C")
+    val body = Bytes.toBytes("body")
+    val A = Bytes.toBytes("A")
+    val spelling = Bytes.toBytes("spelling")
 
     val Content = new Transformation[String]("C:body") {
-        val C = Bytes.toBytes("C")
-        val body = Bytes.toBytes("body")
-
+    
         override def apply(result: Result): String = {
           val cell = result.getColumnLatestCell(C, body)
           Bytes.toString(cell.getValueArray, cell.getValueOffset)
@@ -114,10 +116,42 @@ val documents = new HBaseTable[UUID](sc, "my_documents_table") {
           mutation.addColumn(C, body, Bytes.toBytes(value))
         }
     }
+    
+    val Spelling = new Transformation[String]("A:spelling") {
+    
+        override def apply(result: Result): String = {
+          val cell = result.getColumnLatestCell(A, spelling)
+          Bytes.toString(cell.getValueArray, cell.getValueOffset)
+        }
 
-    val Attributes  = new Transformation[Map[String,String]]("A") {
+        override def applyInverse(value: String, mutation: Put) {
+          mutation.addColumn(A, spelling, Bytes.toBytes(value))
+        }
+    }
+}
+```
 
-        val A = Bytes.toBytes("A")
+Above we have created (and implemented) a fully working HBaseTable instance with 2 trasnformations available that
+can be used to read and write the data as typed RDD. We can for exmple do the following:
+
+```
+val dictionary: RDD[String] ... //contains a dictionary of known enlgish words
+
+val docWords: RDD[(UUID, Seq[String])] = documents.select(documents.Content).mapValues(_.split("\\s+"))
+
+val words = content.flatMap{ case (uuid, words) => words.map(word => (word, uuid))}
+
+val misspelled = words.subtract(dictionary).map{ case (word, uuid) => (uuid, word) }.groupByKey
+
+documents.update(documents.Spelling, misspelled.mapValues(words => "spelling" -> words.mkString(",")))
+```
+
+If we wanted to access the whole column family 'A' as a Map[String,String] of Attribute-Value pairs, we could 
+add another transformation to the table:
+
+```
+    ...
+    val Attributes = new Transformation[Map[String,String]]("A") {
 
         override def apply(result: Result): Map[String, Double] = {
           val builder = Map.newBuilder[String, String]
@@ -139,23 +173,10 @@ val documents = new HBaseTable[UUID](sc, "my_documents_table") {
           }}
         }
     }
-}
+    ...
 ```
 
-Above we have created (and implemented) a fully working HBaseTable instance with 2 trasnformations available that
-can be used to read and write the data as typed RDD.
-
-
-TODO section about bulk-loading the documents from some hdfs directory
-
-```
-val dictionary: RDD[String] ... //contains a dictionary of known enlgish words
-__val docWords: RDD[(UUID, Seq[String])] = documents.select(documents.Content).mapValues(_.split("\\s+"))__
-val wordCounts: RDD[(String, Int)] = content.flatMap{ case (uuid, words) => words.map(word => (word, 1L))}.reduceByKey(_ + _)
-wordCounts.subtract(dictionary).collect.foreach(println) // collect and print all misspelled words and their frequency
-```
-
-TODO section about large-scale join 
+TODO section about bulk-loading the documents from some hdfs data and large-scale join and transformation
 
 # example 4 - experimental stuff
 
