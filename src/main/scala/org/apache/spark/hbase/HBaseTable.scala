@@ -25,12 +25,14 @@ import scala.reflect.ClassTag
  *
  * Once application has an instance of HBaseTable extension this is the summary of methods that can be invoked on that instance:
  *
- * .rdd
- * .rdd(cf*)
- * .rdd(minStamp, maxStamp, cf*)
+ * .rdd()
+ * .select(...)
  * .update
+ * ------------ hbase api operations:
+ * .put
  * .increment
  * .delete
+ * ------------ bulk operations:
  * .bulkLoad
  * .bulkDelete
  */
@@ -62,40 +64,42 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
     }
   }
 
-  def select[F1: ClassTag](f1: ResultFunction[F1])(implicit k: ClassTag[K]): HBaseRDD[K, F1] = {
+  def select[F1: ClassTag](f1: Transformation[F1])(implicit k: ClassTag[K]): HBaseRDD[K, F1] = {
     this.rdd(f1).select(f1.cols: _*)
   }
 
-  def select[F1: ClassTag, F2: ClassTag](f1: ResultFunction[F1], f2: ResultFunction[F2])
+  def select[F1: ClassTag, F2: ClassTag](f1: Transformation[F1], f2: Transformation[F2])
                                         (implicit k: ClassTag[K]): HBaseRDD[K, (F1, F2)] = {
     val f = (result: Result) => (f1(result), f2(result))
     this.rdd(f).select(f1.cols ++ f2.cols: _*)
   }
 
   def select[F1: ClassTag, F2: ClassTag, F3: ClassTag](
-                                                        f1: ResultFunction[F1],
-                                                        f2: ResultFunction[F2],
-                                                        f3: ResultFunction[F3]
+                                                        f1: Transformation[F1],
+                                                        f2: Transformation[F2],
+                                                        f3: Transformation[F3]
                                                         )(implicit k: ClassTag[K]): HBaseRDD[K, (F1, F2, F3)] = {
     val f = (result: Result) => (f1(result), f2(result), f3(result))
     this.rdd(f).select(f1.cols ++ f2.cols ++ f3.cols: _*)
   }
 
-  def select[F1: ClassTag, F2: ClassTag, F3: ClassTag, F4: ClassTag](f1: ResultFunction[F1],
-                                                                     f2: ResultFunction[F2],
-                                                                     f3: ResultFunction[F3],
-                                                                     f4: ResultFunction[F4]
+  def select[F1: ClassTag, F2: ClassTag, F3: ClassTag, F4: ClassTag](f1: Transformation[F1],
+                                                                     f2: Transformation[F2],
+                                                                     f3: Transformation[F3],
+                                                                     f4: Transformation[F4]
                                                                       )(implicit k: ClassTag[K]): HBaseRDD[K, (F1, F2, F3, F4)] = {
     val f = (result: Result) => (f1(result), f2(result), f3(result), f4(result))
     this.rdd(f).select(f1.cols ++ f2.cols ++ f3.cols: _*)
   }
 
-  def select(functions: Seq[ResultFunction[_]])(implicit k: ClassTag[K]): HBaseRDD[K, Seq[_]] = {
+  def select(functions: Seq[Transformation[_]])(implicit k: ClassTag[K]): HBaseRDD[K, Seq[_]] = {
     val f = (result: Result) => functions.map(_(result))
     this.rdd(f).select(functions.flatMap(_.cols): _*)
   }
 
-  def update[V](f: ResultFunction[V], u: RDD[(K, V)])(implicit v: ClassTag[V], k: ClassTag[K]) = {
+  //TODO bulkUpdate[V](f: Transformation[V], u: RDD[(K, V)])(implicit v: ClassTag[V], k: ClassTag[K])
+
+  def update[V](f: Transformation[V], u: RDD[(K, V)])(implicit v: ClassTag[V], k: ClassTag[K]) = {
     val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
     u.partitionBy(partitioner).foreachPartition(partition => {

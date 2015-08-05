@@ -1,16 +1,41 @@
 This is a generic extension of spark for efficient scanning, joining and mutating HBase tables from a spark environment. The master setup is for HBase API 1.1.0.1, Scala 2.10 and Spark 1.4.1 but it is possible to create branches for older APIs simply by changing the versions properties in the pom.xml (dataframes api is not necessary for the basic use case so practically any spark version > 0.92 should work but for HBase old API a small refactor  will be required around the hbase api calls).
 
-Its main concepts are __`HBaseRDD`__ and __`HBaseTable`__. `HBaseRDD` is used for scanning and optimised single-stage joins while `HBaseTable` is for mutating underlying hbase table using RDDs as input.
-
-It can be used in 3 major ways:
+This library can be used in 3 major ways:
 - __Basic__: In the most basic case it can be used to simply map existing hbase tables to HBaseRDD which will result a simple pair RDD[(Array[Byte], hbase.client.Result)]. These can be filtered, transformed,.. as any other RDD and the result can be for example given to HBaseTable as a mutation to execute on the same underlying table.
-- __Standard__: In the more typical case, by extending HBaseRDD and HBaseTable to provide mapping of raw key bytes and hbase result to some more meaningful types. You can learn about this method by studying the demo-simple application
+- __Standard__: In the more typical case, by extending HBaseTable to provide mapping of raw key bytes and hbase result to some more meaningful types. You can learn about this method in the Concepts section below and by studying the example source of the demo-simple application
 - __Specialised/Experimental__: Using the keyspace extension to the basic HBaseRDD and HBaseTable. This extension cannot be used on existing tables because it uses predefined key structure which aims to get the most from both spark and hbase perspective. You can learn more about this method by studying the demo-graph application (the demo is broken in the TODOs below)
 
-There is a couple of implcit conversion functions for HBaseRDD in __`HBaseRDDFunctions`__ which provide `.join` and `.fill` alternatives. The `.join` uses a __`HBaseJoin`__ abstract function which is implemented in 2 versions, both resulting in a single-stage join regardless of partitioners used. One is for situations where the right table is very large portion of the left hbase table - __`HBaseJoinRangeScan` and the other is for situtations where the right table is a small fraction of the left table - __`HBaseJoinMultiGet`. (The mechanism for choosing between the types of join is not done, i.e. at the moment all the joins are mutli-get, see TODO below) Fill is an additional functionality, similar to join except where the argument rdd is treated as to be 'updated' or 'filled-in' where the value of the Option is None - this is for highly iterative algorithms which start from a subset of HBase table and expand it in later iterations.
+# Concepts
 
-__`bulkLoad`__ and __`bulkDelete`__ are available to generate HFiles directly for large mutations.
+The main concept is __`HBaseTable`__ which behaves similarly to the Spark DataFrame API but the push down logic is handled slightly differently.
+Any instance of `HBaseTable` is mapped to the underlying hbase table and its method `.rdd()` gives an instance of __`HBaseRDD`__
+which inherits all transformation methods from RDD[(K,V)] and has some special transformations available via implicit conversions:
+- __`myTable.rdd.filter(Consistency)`__ - server-side scan filter for different levels of consistency required
+- __`myTable.rdd.filter(minStamp, maxStamp)`__ - server-side scan filter for hbase timestamp ranges
+- __`myTable.rdd.select(columnOrFamily1, columnOrFamily2, ...)`__ - server-side scan filter for selected columns or column families
+- __`myTable.rdd.join(other: RDD)`__ - uses a `HBaseJoin abstract function which is implemented in 2 versions, both resulting in a single-stage join regardless of partitioners used. One is for situations where the right table is very large portion of the left hbase table - `HBaseJoinRangeScan` and the other is for situtations where the right table is a small fraction of the left table - `HBaseJoinMultiGet`. (The mechanism for choosing between the types of join is not done, i.e. at the moment all the joins are mutli-get, see TODO below)
+- __`myTable.rdd.rightOuterJoin(other: RDD)`__ - uses the same optimized implementation as join but with rightOuterJoin result
+- __`myTable.rdd.fill(range: RDD)`__ - Fill is an additional functionality, similar to join except where the argument rdd is treated as to be 'updated' or 'filled-in' where the value of the Option is None - this is for highly iterative algorithms which start from a subset of HBase table and expand it in later iterations.
+
+Because these methods are available implicitly for any HBaseRDD or its extension they can be wrapped in additional layers
+via HBaseRDDFiltered that are put together only when a compute method is invoked by a Spark action adding filters,
+ranges etc to the single scan for each region/partition.
+
+Besides HBaseTable and HBaseRDD another important concept is __`Transformation`__ which is a bi-directional mapper
+that can map a basic hbase result value into a type V and inversely, a type V into a Mutation and which also declares
+columns or column families which are required by it. This gives the HBaseTable extensions a very rich high-level
+interface and at the same time optimizes scans which can be filtered under the hood to only read data necessary
+for a given transformation. Transformations can be used with the following HBaseTable methods
+
+- __`myTable.select(Transformation1, Transformation2, ...)`__ - selects only fields required by the selected Transformations and returns HBaseRDD[K, (T1, T2,...)]
+- __`myTable.update(Transformation1, RDD[(K, T1)])`__ - transforms the input RDD, generate region-aware mutations and executes the multi-put mutation on the underlying table
+- __`myTable.bulkUpdate(Transformation1, RDD[(K, T1)])`__ - same as update but not using hbase client API but generating HFiles and submitting them to the HBase Master (see notes below about the bulk operations)
+
+
+## Bulk operations
+__`bulkUpdate`__, __`bulkLoad`__ and __`bulkDelete`__ are available to generate HFiles directly for large mutations.
 __NOTE:__ Due to the way how HBase handles the bulk files submission, the spark shell or job __needs to be started as `hbase` user__ in order to be able to use bulk operations.
+
 
 # quick start (on YARN)
 
@@ -64,8 +89,73 @@ You can then run the demo appliation as a shell:
 
 ``` ./scripts/demo-simple-shell ```
 
-# example 3 - large scale operations
-  TODO demo and section about joining and transforming large tables and using bulk operations
+# example 3 - comprehensive tutorial with large scale operations
+
+Consider a following example of a document table in which each row represents a document,
+keyed by UUID and which has one column family 'A' where each column represents and Attribute of the document
+and column family 'C' which always has one column 'body' containing the content of the document:
+
+```
+val documents = new HBaseTable[UUID](sc, "my_documents_table") {
+
+    override def keyToBytes = (key: UUID) => ByteUtils.UUIDToBytes(key)
+    override def bytesToKey = (bytes: Array[Byte]) => ByteUtils.bytesToUUID(bytes)
+
+    val Content = new Transformation[String]("C:body") {
+        val C = Bytes.toBytes("C")
+        val body = Bytes.toBytes("body")
+
+        override def apply(result: Result): String = {
+          val cell = result.getColumnLatestCell(C, body)
+          Bytes.toString(cell.getValueArray, cell.getValueOffset)
+        }
+
+        override def applyInverse(value: String, mutation: Put) {
+          mutation.addColumn(C, body, Bytes.toBytes(value))
+        }
+    }
+
+    val Attributes  = new Transformation[Map[String,String]]("A") {
+
+        val A = Bytes.toBytes("A")
+
+        override def apply(result: Result): Map[String, Double] = {
+          val builder = Map.newBuilder[String, String]
+          val scanner = result.cellScanner
+          while (scanner.advance) {
+            val kv = scanner.current
+            if (CellUtil.matchingFamily(kv, A)) {
+              val attr = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
+              val value = Bytes.toString(kv.getValueArray, kv.getValueOffset)
+              builder += ((attr, value))
+            }
+          }
+          builder.result
+        }
+
+        override def applyInverse(value: Map[String, String], mutation: Put) {
+          value.foreach { case (attr, value) => {
+            mutation.addColumn(F, Bytes.toBytes(attr), Bytes.toBytes(value))
+          }}
+        }
+    }
+}
+```
+
+Above we have created (and implemented) a fully working HBaseTable instance with 2 trasnformations available that
+can be used to read and write the data as typed RDD.
+
+
+TODO section about bulk-loading the documents from some hdfs directory
+
+```
+val dictionary: RDD[String] ... //contains a dictionary of known enlgish words
+__val docWords: RDD[(UUID, Seq[String])] = documents.select(documents.Content).mapValues(_.split("\\s+"))__
+val wordCounts: RDD[(String, Int)] = content.flatMap{ case (uuid, words) => words.map(word => (word, 1L))}.reduceByKey(_ + _)
+wordCounts.subtract(dictionary).collect.foreach(println) // collect and print all misspelled words and their frequency
+```
+
+TODO section about large-scale join 
 
 # example 4 - experimental stuff
 

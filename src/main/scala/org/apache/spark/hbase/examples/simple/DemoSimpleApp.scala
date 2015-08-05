@@ -20,7 +20,7 @@ class DemoSimpleApp(sc: SparkContext) {
     println(" help - print this usage information")
     println(" table - main example instance of the HBaseTableSimple `demo-simple`")
     println(" collect <RDD> - collet and print the given rdd fully")
-    println(" put  - put example data into the underlying hbase table `demo-simple`")
+    println(" update  - put example data into the underlying hbase table `demo-simple` using Transformation")
     println(" collect - collect all data from the demo table")
     println(" collectNumCells - count number of cells per row in a specialised HBaseRDD[String, Short]")
     println(" collectFeatures - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Double]]")
@@ -31,7 +31,7 @@ class DemoSimpleApp(sc: SparkContext) {
     println(" rightOuterJoin - example rightOuterJoin")
   }
 
-  def put = {
+  def update = {
     println("Updating `demo-simple` column family `F` - Features")
 
     table.update(table.Features, sc.parallelize(Array(
@@ -43,6 +43,13 @@ class DemoSimpleApp(sc: SparkContext) {
     table.update(table.Tags, sc.parallelize(Array(
       "row1" -> List("lego", "music", "motorbike"),
       "row2" -> List("cinema")
+    )))
+
+    println("Updating `demo-simple` column `F:propensity` - Tags")
+    table.update(table.Propensity, sc.parallelize(Array(
+      "row1" -> 0.55,
+      "row2" -> 0.95,
+      "row3" -> 0.99
     )))
   }
 
