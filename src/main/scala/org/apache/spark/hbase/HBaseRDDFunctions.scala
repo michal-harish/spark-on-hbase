@@ -20,24 +20,12 @@ import scala.reflect.ClassTag
  *
  * TODO make sure we understand what self.withScope does
  */
-abstract class HBaseFunction[V](val cols: String*) extends Serializable {
+abstract class HBaseFunction[V](val cols: String*) extends Function[Result, V] with Serializable {
   def apply(v1 : Result) : V
   def applyInverse(value: V, mutation: Put) = {}
 }
 
 class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt: ClassTag[V]) extends Serializable {
-
-  def mapValues[U: ClassTag](f: HBaseFunction[U]): HBaseRDD[K, U] = self.withScope {
-    val cleanF = self.context.clean(f)
-    self.mapResultRDD[U]((result) => f(result), f.cols:_*)
-  }
-
-  def mapValues[U: ClassTag](f: (V) => U): HBaseRDD[K, U] = self.withScope {
-    val cleanF = self.context.clean(f)
-    self.mapResultRDD[U]((result) => cleanF(self.resultToValue(result)), self.columns:_*)
-  }
-
-  //TODO flatMapValues[U: ClassTag](f: (V) => Iterator[U]): HBaseRDD[K, U]
 
   def join[W](other: RDD[(K, W)], partitioner: Partitioner): RDD[(K, (V, W))] = self.withScope {
     join(other).partitionBy(partitioner)

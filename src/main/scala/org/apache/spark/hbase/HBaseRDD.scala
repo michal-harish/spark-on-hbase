@@ -19,7 +19,7 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
                               , val consistency: Consistency
                               , val minStamp: Long
                               , val maxStamp: Long
-                              , val columns: String*) extends RDD[(K, V)](sc, Nil) {
+                              , val columns: String*) extends RDD[(K, V)](sc, Nil) with HBaseScan {
 
   @transient private val tableName = TableName.valueOf(tableNameAsString)
   @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
@@ -39,20 +39,6 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
   def keyToBytes: K => Array[Byte]
 
   def resultToValue: Result => V
-
-  protected def configureRegionScan(scan: Scan) = {
-    //RDDs derived from HBaseRDD can use this to add server-side filters etc.
-  }
-
-  def mapResultRDD[V](resultMapper: (Result) => V, columns: String*) = {
-    new HBaseRDD[K,V](sc, tableNameAsString, consistency, minStamp, maxStamp, columns: _*) {
-      override def bytesToKey = HBaseRDD.this.bytesToKey
-
-      override def keyToBytes: (K) => Array[Byte] = HBaseRDD.this.keyToBytes
-
-      override def resultToValue = resultMapper
-    }
-  }
 
   final override protected def getPartitions: Array[Partition] = {
     (for (i <- 0 to regionSplits.size - 1) yield {

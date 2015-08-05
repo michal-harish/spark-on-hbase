@@ -3,7 +3,7 @@ package org.apache.spark.hbase.examples.graph
 import java.io.{BufferedWriter, OutputStreamWriter}
 
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.hbase.client.Result
+import org.apache.hadoop.hbase.client.{Consistency, Result}
 import org.apache.hadoop.hbase.HConstants._
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
@@ -172,18 +172,20 @@ with AGraph[HE] {
     stream.close
   }
 
-  def rddFeatures: LAYER[FEATURES] = rdd(HKeySpace("d"), OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F").mapValues(CFRFeatures)
+  def rddFeatures: LAYER[FEATURES] = {
+    rdd(Consistency.STRONG, HKeySpace("d"), OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F").mapValues(CFRFeatures)
+  }
 
   def rddFeatures[T](feature: String)(implicit tag: ClassTag[T]): LAYER[T] = {
     val cfFeatures = this.cfFeatures
     val fFeature = Bytes.toBytes(feature)
-    val filtered = rdd(HKeySpace("d"), OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F")
-      .filter(_._2.containsNonEmptyColumn(cfFeatures, fFeature))
     val t: ((Result) => T) = tag.runtimeClass match {
       case java.lang.Long.TYPE => (row: Result) => Bytes.toLong(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
       case java.lang.Double.TYPE => (row: Result) => Bytes.toDouble(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
       case _ => throw new UnsupportedOperationException(tag.runtimeClass.toString)
     }
+    val filtered = rdd((result: Result) => result, Consistency.STRONG, HKeySpace("d"), OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F")
+      .filter(_._2.containsNonEmptyColumn(cfFeatures, fFeature))
     filtered.mapPartitions(rows => rows.map({ case (key, values) => (key, t(values)) }), preservesPartitioning = true)
   }
 
@@ -231,7 +233,7 @@ with AGraph[HE] {
       while (scanner.advance) numEdges += 1L
       numEdges
     }
-    rdd(OLDEST_TIMESTAMP, beforeTimestamp, "N").mapValues(CFRNumEdges)
+    rdd(CFRNumEdges, Consistency.STRONG, OLDEST_TIMESTAMP, beforeTimestamp, "N")
   }
 
   /**
@@ -265,7 +267,7 @@ with AGraph[HE] {
       }
       HKey(if (selectedCell == null) row.getRow else CellUtil.cloneQualifier(selectedCell))
     }
-    rdd(keySpaceCode, OLDEST_TIMESTAMP, beforeTimestamp, "N").mapValues(CFRMaxKey1Space)
+    rdd(CFRMaxKey1Space, Consistency.STRONG, keySpaceCode, OLDEST_TIMESTAMP, beforeTimestamp, "N")
   }
 
   /**
@@ -292,11 +294,10 @@ with AGraph[HE] {
       edgeSeqBuilder.result
     }
     (if (allSpaces) {
-      rdd(minStamp, maxStamp, "N")
+      rdd(CFREdge1S, Consistency.STRONG, minStamp, maxStamp, "N")
     } else {
-      rdd(keySpaceCode, minStamp, maxStamp, "N")
+      rdd(CFREdge1S, Consistency.STRONG, keySpaceCode, minStamp, maxStamp, "N")
     })
-      .mapValues(CFREdge1S) //FIXME this invokes incorrectly the HBaseRDDFunctions.mapValues
   }
 
 

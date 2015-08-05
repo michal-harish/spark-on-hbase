@@ -26,7 +26,7 @@ import scala.collection.JavaConverters._
  * columns is a sequence of string identifiers which can either reference a column family, e.g. 'N' or a specific
  * column, e.g. 'F:propensity'
  */
-class HBaseRDDHKey(@transient private val sc: SparkContext
+abstract class HBaseRDDHKey[V](@transient private val sc: SparkContext
                , tableNameAsString: String
                , consistency: Consistency
                , keySpace: Short
@@ -34,7 +34,7 @@ class HBaseRDDHKey(@transient private val sc: SparkContext
                , maxStamp: Long
                , columns: String*
                 )(implicit reg: HKSREG)
-  extends HBaseRDD[HKey, Result](sc, tableNameAsString, consistency,
+  extends HBaseRDD[HKey, V](sc, tableNameAsString, consistency,
     minStamp, maxStamp, columns:_*) {
 
   def this(sc: SparkContext, tableNameAsString: String, columns: String*)(implicit reg: HKSREG)
@@ -52,8 +52,6 @@ class HBaseRDDHKey(@transient private val sc: SparkContext
   override def bytesToKey = (rowKey: Array[Byte]) => HKey(rowKey)
 
   override def keyToBytes = (key: HKey) => key.bytes
-
-  override def resultToValue = (row: Result) => row
 
   override def configureRegionScan(scan :Scan) = {
     val fuzzyRowfilter = new org.apache.hadoop.hbase.util.Pair(HKeySpace(keySpace).allocate(0), Array[Byte](1, 1, 1, 1, 0, 0))
