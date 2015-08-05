@@ -54,13 +54,18 @@ val sc: SparkContext = ...
 
 val minStamp = HConstants.OLDEST_TIMESTAMP
 val maxStamp = HConstants.LATEST_TIMESTAMP
-val rdd1 = HBaseRDD.create(sc, "my-hbase-table", minStamp, maxStamp, "CF1:col1int", "CF1:col2double")
+val rdd1 = HBaseRDD.create(sc, "my-hbase-table")
+val rdd2 = rdd1.select("CF1:col1int", "CF1:col2double")
+val rdd3 = rdd2.filter(minStamp, maxStamp) 
+
+// all of the RDDs above have default type HBaseRDD[Array[Byte], Result]
+// so we need to do the transformation by hand:
 
 val cf1 = Bytes.toBytes("CF1")
 val qual1 = Bytes.toBytes("col1int")
 val qual2 = Bytes.toBytes("col2double")
 
-val rdd2: RDD[String, (Int, Double)] = rdd1.map { case (rowKey, cells) => {
+val rdd2: RDD[String, (Int, Double)] = rdd3.map { case (rowKey: Array[Byte], cells: Result) => {
     val keyAsString = Bytes.toString(rowKey)
     val cell1 = cells.getColumnLatestCell(cf1, qual1)
     val cell2 = cells.getColumnLatestCell(cf1, qual2)
