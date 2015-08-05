@@ -3,17 +3,28 @@ package org.apache.spark.hbase
 import java.util
 
 import org.apache.hadoop.hbase.client._
+import org.apache.hadoop.hbase.filter.{FilterBase, FilterList, FuzzyRowFilter}
 
 /**
  * Created by mharis on 05/08/15.
  */
 trait HBaseFilter extends Serializable {
 
-  def configureQuery(query: HBaseQuery);
+  def configureQuery(query: HBaseQuery): Unit;
 
 }
 
-class HBaseQuery(query: Query) extends Query {
+class HBaseQuery(query: Query) {
+  def addFilter(filter: FuzzyRowFilter): Unit = {
+    query.getFilter match {
+      case null => query.setFilter(filter)
+      case chain: FilterList => chain.addFilter(filter)
+      case one: FilterBase => query.setFilter(new FilterList(one, filter))
+    }
+  }
+
+  def setConsistency(consistency: Consistency): Unit = query.setConsistency(consistency)
+
   def addColumn(family: Array[Byte], qualifier: Array[Byte]): Unit = query match {
     case scan: Scan => scan.addColumn(family, qualifier)
     case get: Get => get.addColumn(family, qualifier)
@@ -33,10 +44,6 @@ class HBaseQuery(query: Query) extends Query {
     case scan: Scan => scan.setMaxVersions(i)
     case get: Get => get.setMaxVersions(i)
   }
-
-  override def toMap(i: Int): util.Map[String, AnyRef] = query.toMap
-
-  override def getFingerprint: util.Map[String, AnyRef] = query.getFingerprint
 
 }
 

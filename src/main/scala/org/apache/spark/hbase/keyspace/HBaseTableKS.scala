@@ -17,11 +17,11 @@ class HBaseTableKS(sc: SparkContext, tableNameAsString: String)(implicit reg: KS
 
   override def bytesToKey: Array[Byte] => Key = (bytes: Array[Byte]) => Key(bytes)
 
-  def rdd(rowKeySpace: Short): HBaseRDD[Key, Result] = {
+  def rdd(rowKeySpace: Short): HBaseRDDKS[Result] = {
     rdd((result: Result) => result, rowKeySpace)
   }
 
-  protected def rdd[V](valueMapper: (Result) => V, rowKeySpace: Short): HBaseRDD[Key, V] = {
+  protected def rdd[V](valueMapper: (Result) => V, rowKeySpace: Short): HBaseRDDKS[V] = {
     new HBaseRDDKS[V](sc, tableNameAsString, rowKeySpace) {
       override def bytesToKey = HBaseTableKS.this.bytesToKey
 

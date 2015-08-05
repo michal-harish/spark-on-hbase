@@ -1,6 +1,5 @@
 package org.apache.spark.hbase.keyspace
 
-import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.filter.FuzzyRowFilter
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
@@ -29,10 +28,11 @@ import scala.collection.JavaConverters._
 abstract class HBaseRDDKS[V](sc: SparkContext, tableNameAsString: String, keySpace: Short)(implicit reg: KSREG)
   extends HBaseRDD[Key, V](sc, tableNameAsString, Seq(new HBaseFilter() {
       override def configureQuery(query: HBaseQuery): Unit = {
+        println(s"Configuring ${query} with fuzzy row filter")
         val fuzzyRowfilter = new org.apache.hadoop.hbase.util.Pair(
           KeySpace(keySpace)(reg).allocate(0),
           Array[Byte](1, 1, 1, 1, 0, 0))
-        query.setFilter(new FuzzyRowFilter(List(fuzzyRowfilter).asJava))
+        query.addFilter(new FuzzyRowFilter(List(fuzzyRowfilter).asJava))
       }
     })) {
 
