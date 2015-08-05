@@ -7,9 +7,7 @@ This library can be used in 3 major ways:
 
 # Concepts
 
-The main concept is __`HBaseTable`__ which behaves similarly to the Spark DataFrame API but the push down logic is handled slightly differently.
-Any instance of `HBaseTable` is mapped to the underlying hbase table and its method `.rdd()` gives an instance of __`HBaseRDD`__
-which inherits all transformation methods from RDD[(K,V)] and has some special transformations available via implicit conversions:
+The main concept is __`HBaseTable`__ which behaves similarly to the Spark DataFrame API but the push down logic is handled slightly differently. Any instance of `HBaseTable` is mapped to the underlying hbase table and its method `.rdd()` gives an instance of __`HBaseRDD`__ which inherits all transformation methods from RDD[(K,V)] and has some special transformations available via implicit conversions:
 - __`myTable.rdd.filter(Consistency)`__ - server-side scan filter for different levels of consistency required
 - __`myTable.rdd.filter(minStamp, maxStamp)`__ - server-side scan filter for hbase timestamp ranges
 - __`myTable.rdd.select(columnOrFamily1, columnOrFamily2, ...)`__ - server-side scan filter for selected columns or column families
@@ -17,15 +15,10 @@ which inherits all transformation methods from RDD[(K,V)] and has some special t
 - __`myTable.rdd.rightOuterJoin(other: RDD)`__ - uses the same optimized implementation as join but with rightOuterJoin result
 - __`myTable.rdd.fill(range: RDD)`__ - Fill is an additional functionality, similar to join except where the argument rdd is treated as to be 'updated' or 'filled-in' where the value of the Option is None - this is for highly iterative algorithms which start from a subset of HBase table and expand it in later iterations.
 
-Because these methods are available implicitly for any HBaseRDD or its extension they can be wrapped in additional layers
-via HBaseRDDFiltered that are put together only when a compute method is invoked by a Spark action adding filters,
-ranges etc to the single scan for each region/partition.
+Because these methods are available implicitly for any HBaseRDD or its extension they can be wrapped in additional layers via HBaseRDDFiltered that are put together only when a compute method is invoked by a Spark action adding filters, ranges, etc to the single scan for each region/partition.
 
 Besides HBaseTable and HBaseRDD another important concept is __`Transformation`__ which is a bi-directional mapper
-that can map a basic hbase result value into a type V and inversely, a type V into a Mutation and which also declares
-columns or column families which are required by it. This gives the HBaseTable extensions a very rich high-level
-interface and at the same time optimizes scans which can be filtered under the hood to only read data necessary
-for a given transformation. Transformations can be used with the following HBaseTable methods
+that can map a basic hbase result value into a type V and inversely, a type V into a Mutation and which also declares columns or column families which are required by it. This gives the HBaseTable extensions a very rich high-level interface and at the same time optimizes scans which can be filtered under the hood to only read data necessary for a given transformation. Transformations can be used with the following HBaseTable methods
 
 - __`myTable.select(Transformation1, Transformation2, ...)`__ - selects only fields required by the selected Transformations and returns HBaseRDD[K, (T1, T2,...)]
 - __`myTable.update(Transformation1, RDD[(K, T1)])`__ - transforms the input RDD, generate region-aware mutations and executes the multi-put mutation on the underlying table
@@ -89,7 +82,7 @@ You can then run the demo appliation as a shell:
 
 ``` ./scripts/demo-simple-shell ```
 
-# example 3 - comprehensive tutorial with large scale operations
+# example 3 - comprehensive tutorial
 
 Consider a following example of a document table in which each row represents a document,
 keyed by UUID and which has one column family 'A' where each column represents and Attribute of the document
@@ -143,11 +136,12 @@ val words = content.flatMap{ case (uuid, words) => words.map(word => (word, uuid
 
 val misspelled = words.subtract(dictionary).map{ case (word, uuid) => (uuid, word) }.groupByKey
 
-documents.update(documents.Spelling, misspelled.mapValues(words => "spelling" -> words.mkString(",")))
+documents.update(documents.Spelling, misspelled.mapValues(_.mkString(",")))
 ```
 
-If we wanted to access the whole column family 'A' as a Map[String,String] of Attribute-Value pairs, we could 
-add another transformation to the table:
+The code above will find all misspelled words in each document's content and update the `misspelled` attribute with a their coma-separated list. 
+
+If we wanted to access and update the whole column family 'A' as a Map[String,String] of Attribute-Value pairs, we could add another transformation to the table:
 
 ```
     ...
@@ -176,9 +170,10 @@ add another transformation to the table:
     ...
 ```
 
-TODO section about bulk-loading the documents from some hdfs data and large-scale join and transformation
+# example 3 - bulk operations in practice
+TODO section about bulk-loading the documents from some hdfs data and large-scale join and transformation all the way from launching the spark job as hbase user.
 
-# example 4 - experimental stuff
+# example 5 - experimental stuff
 
 This example makes use of the org.apache.spark.hbase.keyspace which provides specialised __`Key`__ implementation that
 addresses several scalability issues and general integration between spark and hbase. It also provides specialised
