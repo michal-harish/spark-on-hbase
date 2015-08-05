@@ -107,9 +107,6 @@ with AGraph[HE] {
   type FEATURES = Map[String, Array[Byte]]
   type STATS = LinkedHashMap[String, Accumulator[Long]]
 
-  val cfNet = Bytes.toBytes("N")
-  val cfEval = Bytes.toBytes("E")
-  val cfFeatures = Bytes.toBytes("F")
 
   @transient
   val propsFile = new Path(s"/hgraph/${tableName}") //TODO configurable path for hgraph properties
@@ -172,19 +169,20 @@ with AGraph[HE] {
     stream.close
   }
 
+  //TODO rebuild Features with ResultFunction
   def rddFeatures: LAYER[FEATURES] = {
-    rdd(Consistency.STRONG, HKeySpace("d"), OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F").mapValues(CFRFeatures)
+    rdd(HKeySpace("d"), "F").mapValues(CFRFeatures)
   }
 
   def rddFeatures[T](feature: String)(implicit tag: ClassTag[T]): LAYER[T] = {
-    val cfFeatures = this.cfFeatures
+    val cfFeatures = Bytes.toBytes("F")
     val fFeature = Bytes.toBytes(feature)
     val t: ((Result) => T) = tag.runtimeClass match {
       case java.lang.Long.TYPE => (row: Result) => Bytes.toLong(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
       case java.lang.Double.TYPE => (row: Result) => Bytes.toDouble(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
       case _ => throw new UnsupportedOperationException(tag.runtimeClass.toString)
     }
-    val filtered = rdd((result: Result) => result, Consistency.STRONG, HKeySpace("d"), OLDEST_TIMESTAMP, LATEST_TIMESTAMP, "F")
+    val filtered = rdd((result: Result) => result, HKeySpace("d"), "F")
       .filter(_._2.containsNonEmptyColumn(cfFeatures, fFeature))
     filtered.mapPartitions(rows => rows.map({ case (key, values) => (key, t(values)) }), preservesPartitioning = true)
   }
@@ -195,7 +193,7 @@ with AGraph[HE] {
       case java.lang.Double.TYPE => (value: T) => Bytes.toBytes(value.asInstanceOf[Double])
       case _ => throw new UnsupportedOperationException
     }
-    put(cfFeatures, x.mapValues(f => (Map(Bytes.toBytes(f._1) ->(t(f._2), HConstants.LATEST_TIMESTAMP)))))
+    put(Bytes.toBytes("F"), x.mapValues(f => (Map(Bytes.toBytes(f._1) ->(t(f._2), HConstants.LATEST_TIMESTAMP)))))
   }
 
   def updateFeatures[T](feature: String, x: LAYER[T])(implicit tag: ClassTag[T]) = {
@@ -205,11 +203,11 @@ with AGraph[HE] {
       case java.lang.Double.TYPE => (value: T) => Bytes.toBytes(value.asInstanceOf[Double])
       case _ => throw new UnsupportedOperationException
     }
-    put(cfFeatures, x.mapValues(f => (Map(fFeature ->(t(f), HConstants.LATEST_TIMESTAMP)))))
+    put(Bytes.toBytes("F"), x.mapValues(f => (Map(fFeature ->(t(f), HConstants.LATEST_TIMESTAMP)))))
   }
 
   def incFeature(feature: String, incRdd: LAYER[Long]) {
-    super.increment(cfFeatures, Bytes.toBytes(feature), incRdd)
+    super.increment(Bytes.toBytes("F"), Bytes.toBytes(feature), incRdd)
   }
 
   def copyNet(dest: HGraphTable, closeContextOnExit: Boolean = false): Long = {
@@ -226,14 +224,13 @@ with AGraph[HE] {
   def histogram(beforeTimestamp: Long = LATEST_TIMESTAMP): Array[(Long, Long)] = hist(rddNumEdges(beforeTimestamp))
 
   def rddNumEdges(beforeTimestamp: Long = LATEST_TIMESTAMP): LAYER[Long] = {
-    val cfNet = Bytes.toBytes("N")
     val CFRNumEdges = (row: Result) => {
       val scanner = row.cellScanner
       var numEdges = 0L
       while (scanner.advance) numEdges += 1L
       numEdges
     }
-    rdd(CFRNumEdges, Consistency.STRONG, OLDEST_TIMESTAMP, beforeTimestamp, "N")
+    rdd(CFRNumEdges, "N").filter(OLDEST_TIMESTAMP, beforeTimestamp)
   }
 
   /**
@@ -253,8 +250,7 @@ with AGraph[HE] {
   /**
    * rddPool Returns a POOL of all Row keys in the given key space and their maximum connected Row in the same key space
    */
-  def rddPool(keySpace: String, beforeTimestamp: Long = LATEST_TIMESTAMP): POOL = {
-    val cfNet = this.cfNet
+  def rddPool(keySpace: String): POOL = {
     val keySpaceCode = HKeySpace(keySpace)
     val CFRMaxKey1Space = (row: Result) => {
       val scanner = row.cellScanner
@@ -267,17 +263,16 @@ with AGraph[HE] {
       }
       HKey(if (selectedCell == null) row.getRow else CellUtil.cloneQualifier(selectedCell))
     }
-    rdd(CFRMaxKey1Space, Consistency.STRONG, keySpaceCode, OLDEST_TIMESTAMP, beforeTimestamp, "N")
+    rdd(CFRMaxKey1Space, keySpaceCode, "N")
   }
 
   /**
    * rddNet is the RDD representation of the underlying hbase state of the N (NETWORK) column family
    * it includes the singletons which will have an empty Seq() in the value
    */
-  def rddNet: NETWORK = rddNet("*", OLDEST_TIMESTAMP, LATEST_TIMESTAMP)
+  def rddNet: NETWORK = rddNet("*")
 
-  def rddNet(keySpace: String, minStamp:Long = OLDEST_TIMESTAMP, maxStamp: Long = LATEST_TIMESTAMP): NETWORK = {
-    val cfNet = this.cfNet
+  def rddNet(keySpace: String): NETWORK = {
     val keySpaceCode = HKeySpace(keySpace)
     val allSpaces = keySpace == "*"
     val CFREdge1S = (row: Result) => {
@@ -294,9 +289,9 @@ with AGraph[HE] {
       edgeSeqBuilder.result
     }
     (if (allSpaces) {
-      rdd(CFREdge1S, Consistency.STRONG, minStamp, maxStamp, "N")
+      rdd(CFREdge1S, "N")
     } else {
-      rdd(CFREdge1S, Consistency.STRONG, keySpaceCode, minStamp, maxStamp, "N")
+      rdd(CFREdge1S, keySpaceCode, "N")
     })
   }
 
@@ -323,15 +318,16 @@ with AGraph[HE] {
 //  }
 
   def loadPairs(update: PAIRS, completeAsync: Boolean = true): Long = {
-    super.bulkLoad(cfNet, reverse(update).mapValues{ case (key, he) => Map(key.bytes -> he.hbaseValue)}, completeAsync)
+    super.bulkLoad(Bytes.toBytes("N"), reverse(update).mapValues{
+      case (key, he) => Map(key.bytes -> he.hbaseValue)}, completeAsync)
   }
 
   def updateNetRdd(update: NETWORK) = update.mapValues(_.map { case (key, he) => (key.bytes, he.hbaseValue) }.toMap)
 
-  def updateNet(rdd: NETWORK): Long = super.put(cfNet, updateNetRdd(rdd))
+  def updateNet(rdd: NETWORK): Long = super.put(Bytes.toBytes("N"), updateNetRdd(rdd))
 
   def loadNet(rdd: NETWORK, completeAsync: Boolean = true): Long = {
-    super.bulkLoad(cfNet, updateNetRdd(rdd), completeAsync)
+    super.bulkLoad(Bytes.toBytes("N"), updateNetRdd(rdd), completeAsync)
   }
 
 //  def loadNet(bsp: BSP_RESULT,  completeAsync: Boolean): Unit = {
@@ -360,7 +356,7 @@ with AGraph[HE] {
   def removeNet(rdd: NETWORK, completeAsync: Boolean = true): Long = {
     val d = rdd.flatMap { case (key, edges) => edges.map(e => (e._1, Set(key.bytes))) :+(key, Set(null.asInstanceOf[Array[Byte]])) }
       .reduceByKey(_ ++ _).mapValues(_.toSeq)
-    bulkDelete(cfNet, d, completeAsync)
+    bulkDelete(Bytes.toBytes("N"), d, completeAsync)
   }
 
 //  /**

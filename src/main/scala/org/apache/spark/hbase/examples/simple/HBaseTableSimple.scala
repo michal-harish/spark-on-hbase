@@ -32,7 +32,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBas
 
   override def bytesToKey = (bytes: Array[Byte]) => Bytes.toString(bytes)
 
-  val Tags = new HBaseFunction[List[String]]("T") {
+  val Tags = new ResultFunction[List[String]]("T") {
     val T = Bytes.toBytes("T")
     override def apply(result: Result): List[String] = {
       {
@@ -56,7 +56,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBas
     }
   }
 
-  val Features = new HBaseFunction[Map[String, Double]]("F") {
+  val Features = new ResultFunction[Map[String, Double]]("F") {
     val F = Bytes.toBytes("F")
 
     override def apply(result: Result): Map[String, Double] = {
@@ -79,7 +79,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBas
     }
   }
 
-  val CellCount = new HBaseFunction[Short]("T", "F") {
+  val CellCount = new ResultFunction[Short]("T", "F") {
     override def apply(result: Result): Short = {
       var numCells: Int = 0
       val scanner = result.cellScanner
@@ -90,7 +90,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBas
     }: Short
   }
 
-  val Propensity = new HBaseFunction[Double]("F:propensity") {
+  val Propensity = new ResultFunction[Double]("F:propensity") {
     val F = Bytes.toBytes("F")
     val propensity = Bytes.toBytes("propensity")
 

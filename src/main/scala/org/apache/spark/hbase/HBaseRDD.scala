@@ -2,11 +2,10 @@ package org.apache.spark.hbase
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.client._
-import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{HBaseConfiguration, HConstants, TableName}
+import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
+import org.apache.spark._
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
-import org.apache.spark._
 
 import scala.reflect.ClassTag
 
@@ -14,12 +13,9 @@ import scala.reflect.ClassTag
  * Created by mharis on 26/07/15.
  */
 
-abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
+abstract class HBaseRDD[K, V](@transient val sc: SparkContext
                               , val tableNameAsString: String
-                              , val consistency: Consistency
-                              , val minStamp: Long
-                              , val maxStamp: Long
-                              , val columns: String*) extends RDD[(K, V)](sc, Nil) with HBaseScan {
+                              , val filters: Seq[HBaseFilter]) extends RDD[(K, V)](sc, Nil) {
 
   @transient private val tableName = TableName.valueOf(tableNameAsString)
   @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
@@ -27,12 +23,6 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
   protected val regionSplits: Array[(Array[Byte], Array[Byte])] = Utils.getRegionSplits(hbaseConf, tableName)
   @transient override val partitioner: Option[Partitioner] = Some(new RegionPartitioner(regionSplits.size))
 
-  val cf: Seq[Array[Byte]] = columns.map(_ match {
-    case cf: String if (!cf.contains(':')) => Bytes.toBytes(cf)
-    case column: String => column.split(":") match {
-      case Array(cf, qualifier) => Bytes.toBytes(cf)
-    }
-  })
 
   def bytesToKey: Array[Byte] => K
 
@@ -48,12 +38,23 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
     }).toArray
   }
 
+
+  final def configureQuery(query: HBaseQuery) = {
+    query.setMaxVersions(1)
+    filters.foreach(_.configureQuery(query))
+  }
+
   @DeveloperApi
   final override def compute(split: Partition, context: TaskContext): Iterator[(K, V)] = {
 
     val connection = ConnectionFactory.createConnection(configuration.value)
     val table = connection.getTable(TableName.valueOf(tableNameAsString))
-    val scan = getRegionScan(split.index)
+    val scan = new Scan()
+    val (startKey, stopKey) = regionSplits(split.index)
+    if (startKey.size > 0) scan.setStartRow(startKey)
+    if (stopKey.size > 0) scan.setStopRow(stopKey)
+    configureQuery(scan)
+
     val scanner: ResultScanner = table.getScanner(scan)
     var current: Option[(K, V)] = None
 
@@ -90,48 +91,22 @@ abstract class HBaseRDD[K, V](@transient private val sc: SparkContext
     }
   }
 
-  private def getRegionScan(region: Int): Scan = {
-    val scan = new Scan()
-    scan.setMaxVersions(1)
-    scan.setConsistency(Consistency.STRONG)
-    if (columns.size > 0) {
-      columns.foreach(_ match {
-        case cf: String if (!cf.contains(':')) => scan.addFamily(Bytes.toBytes(cf))
-        case column: String => column.split(":") match {
-          case Array(cf, qualifier) => scan.addColumn(Bytes.toBytes(cf), Bytes.toBytes(qualifier))
-        }
-      })
-    }
-    val (startKey, stopKey) = regionSplits(region)
-    if (startKey.size > 0) scan.setStartRow(startKey)
-    if (stopKey.size > 0) scan.setStopRow(stopKey)
-    if (minStamp != HConstants.OLDEST_TIMESTAMP || maxStamp != HConstants.LATEST_TIMESTAMP) {
-      scan.setTimeRange(minStamp, maxStamp)
-    }
-    configureRegionScan(scan)
-    scan
-  }
-
 }
 
 object HBaseRDD {
 
   implicit def hBaseRddToPairRDDFunctions[K, V, H](rdd: HBaseRDD[K, V])
-    (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null): HBaseRDDFunctions[K, V] = {
+                                                  (implicit kt: ClassTag[K], vt: ClassTag[V], ord: Ordering[K] = null): HBaseRDDFunctions[K, V] = {
     new HBaseRDDFunctions[K, V](rdd)
   }
 
-  def create(sc: SparkContext,
-             tableNameAsString: String,
-             consistency: Consistency,
-             minStamp: Long,
-             maxStamp: Long,
-             columns: String*)
-  = new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, consistency, minStamp, maxStamp, columns:_*) {
-    override def bytesToKey = (bytes: Array[Byte]) => bytes
+  def create(sc: SparkContext, tableNameAsString: String, columns: String*) = {
+    new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, Nil) {
+      override def bytesToKey = (bytes: Array[Byte]) => bytes
 
-    override def resultToValue = (result: Result) => result
+      override def resultToValue = (result: Result) => result
 
-    override def keyToBytes = (key: Array[Byte]) => key
+      override def keyToBytes = (key: Array[Byte]) => key
+    }.select(columns: _*)
   }
 }
