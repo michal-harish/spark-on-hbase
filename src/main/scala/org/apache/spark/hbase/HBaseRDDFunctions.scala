@@ -26,7 +26,7 @@ import scala.reflect.ClassTag
 class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt: ClassTag[V]) extends Serializable {
 
   def filter(f: TransformationFilter[_]) = new HBaseRDDFiltered[K, V](self, new HBaseFilter {
-    override def configureQuery(query: HBaseQuery): Unit = query.addFilter(f.createFilter)
+    override def configureQuery(query: HBaseQuery): Unit = f.configureQuery(query)
   })
 
   def filter(consistency: Consistency) = new HBaseRDDFiltered[K, V](self, new HBaseFilter() {

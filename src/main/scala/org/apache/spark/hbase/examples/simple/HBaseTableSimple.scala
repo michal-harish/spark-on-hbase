@@ -1,10 +1,8 @@
 package org.apache.spark.hbase.examples.simple
 
-import org.apache.hadoop.hbase.{Cell, CellUtil}
 import org.apache.hadoop.hbase.client.{Put, Result}
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
-import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
 import org.apache.spark.hbase.helpers._
@@ -41,7 +39,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String)
   val Scores = TStringDouble("S")
 
   //custom transformation over multiple column families
-  val CellCount = new Transformation[Short]("T", "F") {
+  val CellCount = new Transformation[Short]("T", "F", "S") {
     override def apply(result: Result): Short = {
       var numCells: Int = 0
       val scanner = result.cellScanner
@@ -52,29 +50,16 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String)
     }: Short
   }
 
-  val Tags = new Transformation[List[String]]("T") {
-    val T = Bytes.toBytes("T")
+  //custom tansformation of columnfamily transformation nested, i.e. we don't use the value form T column family so Set is nicer
+  val Tags = new Transformation[Set[String]]("T") {
+    val cfTransformation = new TStringNull("T")
 
-    override def apply(result: Result): List[String] = {
-      {
-        val tagList = List.newBuilder[String]
-        val scanner = result.cellScanner
-        while (scanner.advance) {
-          val kv = scanner.current
-          if (CellUtil.matchingFamily(kv, T)) {
-            val tag = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
-            tagList += tag
-          }
-        }
-        tagList.result
-      }
-    }
+    def contains(tag: String) = cfTransformation.contains(tag)
 
-    override def applyInverse(value: List[String], mutation: Put) {
-      value.foreach { case (tag) => {
-        mutation.addColumn(T, Bytes.toBytes(tag), Array[Byte]())
-      }
-      }
+    override def apply(result: Result): Set[String] = cfTransformation.apply(result).keySet
+
+    override def applyInverse(value: Set[String], mutation: Put) {
+      cfTransformation.applyInverse(value.map(x => (x -> null)).toMap, mutation)
     }
   }
 

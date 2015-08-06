@@ -30,6 +30,7 @@ class DemoSimpleApp(sc: SparkContext) {
     println(" collectTagsAndFeatures - collect both column families T and F from the demo table and map it to specialised HBaseRDD[String, (List[String], Map[String,Double])]")
     println(" join - example join")
     println(" rightOuterJoin - example rightOuterJoin")
+    println(" filter - example transformation filter")
   }
 
   def update = {
@@ -98,4 +99,8 @@ class DemoSimpleApp(sc: SparkContext) {
     table.select(table.Tags).rightOuterJoin(other).collect.foreach(println)
   }
 
+  def filter = {
+    println("> table.select(table.Features).filter(table.Tags contains \"lego\").collect.foreach(println)")
+    table.select(table.Features).filter(table.Tags contains "lego").collect.foreach(println)
+  }
 }

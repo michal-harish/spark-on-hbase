@@ -34,7 +34,5 @@ abstract class ColumnFamilyTransformation[K, V](private val cf: String) extends 
 
   def applyCellInverse(key: K, value: V): (Array[Byte], Array[Byte])
 
-  def contains(key: K) = {
-    new TransformationFilterCONTAINS[K, V](this, key)
-  }
+  def contains(key: K) = new TransformationFilterCONTAINSQUALIFIER[K, V](this, key)
 }
