@@ -1,7 +1,7 @@
 package org.apache.spark.hbase.helpers
 
 import org.apache.hadoop.hbase.filter._
-import org.apache.spark.hbase.Transformation
+import org.apache.spark.hbase.{HBaseQuery, Transformation}
 
 /**
  * Created by mharis on 05/08/15.
@@ -11,20 +11,21 @@ import org.apache.spark.hbase.Transformation
  */
 abstract class TransformationFilter[V](val t: Transformation[_]) extends Serializable {
 
-  def createFilter: Filter
+  def configureQuery(query: HBaseQuery)
   
 }
 
-class TransformationFilterCONTAINS[K, V](t: ColumnFamilyTransformation[K,V], key: K)
+class TransformationFilterCONTAINSQUALIFIER[K, V](t: ColumnFamilyTransformation[K,V], key: K)
   extends TransformationFilter[Map[K,V]](t) {
 
-  override def createFilter: Filter = {
+  override def configureQuery(query: HBaseQuery) {
     val f = new SingleColumnValueFilter(
       t.family,
       t.applyCellInverse(key, null.asInstanceOf[V])._1,
       CompareFilter.CompareOp.NOT_EQUAL,
       new NullComparator())
     f.setFilterIfMissing(true)
-    f
+    query.addFilter(f)
+    query.addFamily(t.family)
   }
 }
