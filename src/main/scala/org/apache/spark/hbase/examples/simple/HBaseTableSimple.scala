@@ -7,14 +7,15 @@ import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
-import org.apache.spark.hbase.helpers.{TStringDouble, TDouble, ColumnFamilyTransformation, KeyString}
+import org.apache.spark.hbase.helpers._
 
 /**
  * Created by mharis on 27/07/15.
  *
  * Example
- * 'F' Column Family 'Features' - here the columns will be treated as [String -> Double] key value pairs
+ * 'F' Column Family 'Features' - here the columns will be treated as [String -> Long] key value pairs
  * 'T' Column Family 'Tags' - only using qualifiers to have a Set[String]
+ * 'S' Column Family 'Scores' - treated as [String -> Double] key value pairs
  */
 object HBaseTableSimple {
 
@@ -22,6 +23,8 @@ object HBaseTableSimple {
     Utils.column("T", inMemory = false, ttlSeconds = 86400 * 90, BloomType.ROW,
       maxVersions = 1, Algorithm.SNAPPY, blocksize = 64 * 1024),
     Utils.column("F", inMemory = false, ttlSeconds = 86400 * 90, BloomType.ROWCOL,
+      maxVersions = 1, Algorithm.SNAPPY, blocksize = 64 * 1024),
+    Utils.column("S", inMemory = false, ttlSeconds = 86400 * 90, BloomType.ROWCOL,
       maxVersions = 1, Algorithm.SNAPPY, blocksize = 64 * 1024)
   )
 
@@ -30,11 +33,12 @@ object HBaseTableSimple {
 class HBaseTableSimple(sc: SparkContext, tableNameAsString: String)
   extends HBaseTable[String](sc, tableNameAsString) with KeyString {
 
-  //using predefined transformations can be done inline - see DemoSimpleApp
-  //TDouble("F:propensity")
 
   //predefined column family transformation can be declared for shorthand
-  val Features = TStringDouble("F")
+  val Features = TStringLong("F")
+  //using predefined transformations can be done inline - see DemoSimpleApp - e.g. TDouble("F:propensity")
+
+  val Scores = TStringDouble("S")
 
   //custom transformation over multiple column families
   val CellCount = new Transformation[Short]("T", "F") {

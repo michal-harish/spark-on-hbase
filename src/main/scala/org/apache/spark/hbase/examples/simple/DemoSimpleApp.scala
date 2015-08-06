@@ -2,7 +2,7 @@ package org.apache.spark.hbase.examples.simple
 
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.Utils
-import org.apache.spark.hbase.helpers.TDouble
+import org.apache.spark.hbase.helpers.TLong
 
 /**
  * Created by mharis on 28/07/15.
@@ -24,8 +24,8 @@ class DemoSimpleApp(sc: SparkContext) {
     println(" update  - put example data into the underlying hbase table `demo-simple` using Transformation")
     println(" collect - collect all data from the demo table")
     println(" collectNumCells - count number of cells per row in a specialised HBaseRDD[String, Short]")
-    println(" collectFeatures - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Double]]")
-    println(" collectPropensity - collect column `propensity` from family `F` as a specialised HBaseRDD[String, Double]")
+    println(" collectFeatures - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Long]]")
+    println(" collectHeight - collect column `height` from family `F` as a specialised HBaseRDD[String, Long]")
     println(" collectTags - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Double]]")
     println(" collectTagsAndFeatures - collect both column families T and F from the demo table and map it to specialised HBaseRDD[String, (List[String], Map[String,Double])]")
     println(" join - example join")
@@ -36,8 +36,8 @@ class DemoSimpleApp(sc: SparkContext) {
     println("Updating `demo-simple` column family `F` - Features")
 
     table.update(table.Features, sc.parallelize(Array(
-      "row1" -> Map("propensity" -> 0.5, "width" -> 100.0),
-      "row2" -> Map("propensity" -> 0.9, "width" -> 300.0)
+      "row1" -> Map("height" -> 50L, "width" -> 100L),
+      "row2" -> Map("height" -> 90L, "width" -> 300L)
     )))
 
     println("Updating `demo-simple` column family `T` - Tags")
@@ -46,11 +46,11 @@ class DemoSimpleApp(sc: SparkContext) {
       "row2" -> List("cinema")
     )))
 
-    println("Updating `demo-simple` column `F:propensity` - Tags")
-    table.update(TDouble("F:Propensity"), sc.parallelize(Array(
-      "row1" -> 0.55,
-      "row2" -> 0.95,
-      "row3" -> 0.99
+    println("Updating `demo-simple` column `F:height`")
+    table.update(TLong("F:height"), sc.parallelize(Array(
+      "row1" -> 55L,
+      "row2" -> 95L,
+      "row3" -> 99L
     )))
   }
 
@@ -64,9 +64,9 @@ class DemoSimpleApp(sc: SparkContext) {
     table.select(table.Features).collect.foreach(println)
   }
 
-  def collectPropensity = {
-    println("> table.select(TDouble(\"F:propensity\")).collect.foreach(println)")
-    table.select(TDouble("F:propensity")).collect.foreach(println)
+  def collectHeight = {
+    println("> table.select(TLong(\"F:height\")).collect.foreach(println)")
+    table.select(TLong("F:height")).collect.foreach(println)
   }
 
   def collectTags = {

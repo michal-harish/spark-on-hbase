@@ -94,8 +94,6 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
     this.rdd(f).select(functions.flatMap(_.cols): _*)
   }
 
-  //TODO bulkUpdate[V](f: Transformation[V], u: RDD[(K, V)])(implicit v: ClassTag[V], k: ClassTag[K])
-
   def update[V](f: Transformation[V], u: RDD[(K, V)])(implicit v: ClassTag[V], k: ClassTag[K]) = {
     val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
@@ -117,7 +115,6 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
       }
     })
   }
-
 
   def put(family: Array[Byte], updateRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])])(implicit tag: ClassTag[K]): Long = {
     val broadCastConf = new SerializableWritable(hbaseConf)
@@ -228,6 +225,8 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
       }
     }
   }
+
+  //TODO bulkUpdate[V](f: Transformation[V], u: RDD[(K, V)])(implicit v: ClassTag[V], k: ClassTag[K])
 
   def bulkLoad(family: Array[Byte], bulkRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])], completeAsync: Boolean): Long = {
     val acc = sc.accumulator(0L, s"HBATable ${tableName} load count")
