@@ -21,6 +21,7 @@ Besides HBaseTable and HBaseRDD another important concept is __`Transformation`_
 that can map a basic hbase result value into a type V and inversely, a type V into a Mutation and which also declares columns or column families which are required by it. This gives the HBaseTable extensions a very rich high-level interface and at the same time optimizes scans which can be filtered under the hood to only read data necessary for a given transformation. Transformations can be used with the following HBaseTable methods
 
 - __`myTable.select(Transformation1, Transformation2, ...)`__ - selects only fields required by the selected Transformations and returns HBaseRDD[K, (T1, T2,...)]
+- __`myTable.rdd.filter(Transformation1[V] ==|<|>|!=|contains <V>)`__ - server-side filter applied on the transformation
 - __`myTable.update(Transformation1, RDD[(K, T1)])`__ - transforms the input RDD, generate region-aware mutations and executes the multi-put mutation on the underlying table
 - __`myTable.bulkUpdate(Transformation1, RDD[(K, T1)])`__ - same as update but not using hbase client API but generating HFiles and submitting them to the HBase Master (see notes below about the bulk operations)
 
