@@ -6,6 +6,7 @@ import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.filter.{NullComparator, CompareFilter, SingleColumnValueFilter, SkipFilter}
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{HConstants, TableName}
+import org.apache.spark.hbase.helpers.TransformationFilter
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partitioner, SerializableWritable}
 
