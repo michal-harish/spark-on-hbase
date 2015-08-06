@@ -8,8 +8,9 @@ import org.apache.spark.hbase.Transformation
 /**
  * Created by mharis on 06/08/15.
  */
-abstract class ColumnFamilyTransformation[K,V](private val cf: String) extends Transformation[Map[K,V]](cf) {
+abstract class ColumnFamilyTransformation[K, V](private val cf: String) extends Transformation[Map[K, V]](cf) {
   val family: Array[Byte] = Bytes.toBytes(cf)
+
   final override def apply(result: Result): Map[K, V] = {
     val builder = Map.newBuilder[K, V]
     val scanner = result.cellScanner
@@ -21,6 +22,7 @@ abstract class ColumnFamilyTransformation[K,V](private val cf: String) extends T
     }
     builder.result
   }
+
   final override def applyInverse(value: Map[K, V], mutation: Put) {
     value.foreach { case (feature, value) => {
       val m = applyCellInverse(feature, value)
@@ -28,9 +30,11 @@ abstract class ColumnFamilyTransformation[K,V](private val cf: String) extends T
     }}
   }
 
-  def applyCell(cell: Cell): (K,V)
+  def applyCell(cell: Cell): (K, V)
 
   def applyCellInverse(key: K, value: V): (Array[Byte], Array[Byte])
 
-
+  def contains(key: K) = {
+    new TransformationFilterCONTAINS[K, V](this, key)
+  }
 }
