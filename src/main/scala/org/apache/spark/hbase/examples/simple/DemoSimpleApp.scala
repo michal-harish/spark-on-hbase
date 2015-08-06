@@ -2,6 +2,7 @@ package org.apache.spark.hbase.examples.simple
 
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.Utils
+import org.apache.spark.hbase.helpers.TDouble
 
 /**
  * Created by mharis on 28/07/15.
@@ -46,7 +47,7 @@ class DemoSimpleApp(sc: SparkContext) {
     )))
 
     println("Updating `demo-simple` column `F:propensity` - Tags")
-    table.update(table.Propensity, sc.parallelize(Array(
+    table.update(TDouble("F:Propensity"), sc.parallelize(Array(
       "row1" -> 0.55,
       "row2" -> 0.95,
       "row3" -> 0.99
@@ -64,8 +65,8 @@ class DemoSimpleApp(sc: SparkContext) {
   }
 
   def collectPropensity = {
-    println("> table.select(table.Propensity).collect.foreach(println)")
-    table.select(table.Propensity).collect.foreach(println)
+    println("> table.select(TDouble(\"F:propensity\")).collect.foreach(println)")
+    table.select(TDouble("F:propensity")).collect.foreach(println)
   }
 
   def collectTags = {

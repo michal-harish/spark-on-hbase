@@ -2,11 +2,13 @@ package org.apache.spark.hbase
 
 import java.util
 
-import org.apache.hadoop.hbase.{HConstants, TableName}
 import org.apache.hadoop.hbase.client._
+import org.apache.hadoop.hbase.filter.{NullComparator, CompareFilter, SingleColumnValueFilter, SkipFilter}
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.{Partitioner, SerializableWritable}
+import org.apache.hadoop.hbase.{HConstants, TableName}
+import org.apache.spark.hbase.helpers.TransformationFilter
 import org.apache.spark.rdd.RDD
+import org.apache.spark.{Partitioner, SerializableWritable}
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
@@ -23,13 +25,13 @@ import scala.reflect.ClassTag
 
 class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt: ClassTag[V]) extends Serializable {
 
-  def filter(consistency: Consistency) = new HBaseRDDFiltered[K,V](self, new HBaseFilter() {
+  def filter(consistency: Consistency) = new HBaseRDDFiltered[K, V](self, new HBaseFilter() {
     override def configureQuery(query: HBaseQuery): Unit = {
       query.setConsistency(consistency)
     }
   })
 
-  def filter(minStamp: Long, maxStamp: Long) = new HBaseRDDFiltered[K,V](self, new HBaseFilter() {
+  def filter(minStamp: Long, maxStamp: Long) = new HBaseRDDFiltered[K, V](self, new HBaseFilter() {
     override def configureQuery(query: HBaseQuery): Unit = {
 
       if (minStamp != HConstants.OLDEST_TIMESTAMP || maxStamp != HConstants.LATEST_TIMESTAMP) {
@@ -38,13 +40,18 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
     }
   })
 
-  def select(columns: String*) = new HBaseRDDFiltered[K,V](self, new HBaseFilter {
+  def select(columns: String*) = new HBaseRDDFiltered[K, V](self, new HBaseFilter {
     override def configureQuery(query: HBaseQuery): Unit = {
       if (columns.size > 0) {
         columns.foreach(_ match {
           case cf: String if (!cf.contains(':')) => query.addFamily(Bytes.toBytes(cf))
-          case column: String => column.split(":") match {
-            case Array(cf, qualifier) => query.addColumn(Bytes.toBytes(cf), Bytes.toBytes(qualifier))
+          case column: String => column.split(":").map(Bytes.toBytes(_)) match {
+            case Array(cf, qualifier) => {
+              query.addColumn(cf, qualifier)
+              val f = new SingleColumnValueFilter(cf, qualifier, CompareFilter.CompareOp.NOT_EQUAL, new NullComparator())
+              f.setFilterIfMissing(true)
+              query.addFilter(f)
+            }
           }
         })
       }

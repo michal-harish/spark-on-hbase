@@ -1,12 +1,13 @@
 package org.apache.spark.hbase.examples.simple
 
-import org.apache.hadoop.hbase.CellUtil
+import org.apache.hadoop.hbase.{Cell, CellUtil}
 import org.apache.hadoop.hbase.client.{Put, Result}
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
+import org.apache.spark.hbase.helpers.{TStringDouble, TDouble, ColumnFamilyTransformation, KeyString}
 
 /**
  * Created by mharis on 27/07/15.
@@ -26,14 +27,30 @@ object HBaseTableSimple {
 
 }
 
-class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBaseTable[String](sc, tableNameAsString) {
+class HBaseTableSimple(sc: SparkContext, tableNameAsString: String)
+  extends HBaseTable[String](sc, tableNameAsString) with KeyString {
 
-  override def keyToBytes = (key: String) => Bytes.toBytes(key)
+  //using predefined transformations can be done inline - see DemoSimpleApp
+  //TDouble("F:propensity")
 
-  override def bytesToKey = (bytes: Array[Byte]) => Bytes.toString(bytes)
+  //predefined column family transformation can be declared for shorthand
+  val Features = TStringDouble("F")
+
+  //custom transformation over multiple column families
+  val CellCount = new Transformation[Short]("T", "F") {
+    override def apply(result: Result): Short = {
+      var numCells: Int = 0
+      val scanner = result.cellScanner
+      while (scanner.advance) {
+        numCells = numCells + 1
+      }
+      numCells.toShort
+    }: Short
+  }
 
   val Tags = new Transformation[List[String]]("T") {
     val T = Bytes.toBytes("T")
+
     override def apply(result: Result): List[String] = {
       {
         val tagList = List.newBuilder[String]
@@ -52,56 +69,9 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String) extends HBas
     override def applyInverse(value: List[String], mutation: Put) {
       value.foreach { case (tag) => {
         mutation.addColumn(T, Bytes.toBytes(tag), Array[Byte]())
-      }}
-    }
-  }
-
-  val Features = new Transformation[Map[String, Double]]("F") {
-    val F = Bytes.toBytes("F")
-
-    override def apply(result: Result): Map[String, Double] = {
-      val featureMapBuilder = Map.newBuilder[String, Double]
-      val scanner = result.cellScanner
-      while (scanner.advance) {
-        val kv = scanner.current
-        if (CellUtil.matchingFamily(kv, F)) {
-          val feature = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
-          val value = Bytes.toDouble(kv.getValueArray, kv.getValueOffset)
-          featureMapBuilder += ((feature, value))
-        }
       }
-      featureMapBuilder.result
-    }
-    override def applyInverse(value: Map[String, Double], mutation: Put) {
-      value.foreach { case (feature, value) => {
-        mutation.addColumn(F, Bytes.toBytes(feature), Bytes.toBytes(value))
-      }}
-    }
-  }
-
-  val CellCount = new Transformation[Short]("T", "F") {
-    override def apply(result: Result): Short = {
-      var numCells: Int = 0
-      val scanner = result.cellScanner
-      while (scanner.advance) {
-        numCells = numCells + 1
       }
-      numCells.toShort
-    }: Short
-  }
-
-  val Propensity = new Transformation[Double]("F:propensity") {
-    val F = Bytes.toBytes("F")
-    val propensity = Bytes.toBytes("propensity")
-
-    override def apply(result: Result): Double = {
-      val cell = result.getColumnLatestCell(F, propensity)
-      Bytes.toDouble(cell.getValueArray, cell.getValueOffset)
     }
-    override def applyInverse(value: Double, mutation: Put) {
-      mutation.addColumn(F, propensity, Bytes.toBytes(value))
-    }
-
   }
 
 }

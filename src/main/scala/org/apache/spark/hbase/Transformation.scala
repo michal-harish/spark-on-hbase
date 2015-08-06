@@ -10,3 +10,6 @@ abstract class Transformation[V](val cols: String*) extends Function[Result, V] 
 
   def applyInverse(value: V, mutation: Put) = {}
 }
+
+
+

@@ -6,11 +6,12 @@ import org.apache.spark.hbase.examples.graph.DemoGraphApp
 
 import scala.math._
 import org.apache.spark.hbase._
-import org.apache.spark.hbase.keyspace._
+import org.apache.spark.hbase.helpers._
 import org.apache.spark.hbase.examples.simple._
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.storage.StorageLevel._
 import org.apache.hadoop.hbase.HConstants._
+import org.apache.hadoop.hbase.client._
+import org.apache.spark.storage.StorageLevel._
 
 
 /**

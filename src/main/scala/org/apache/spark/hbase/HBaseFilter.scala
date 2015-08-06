@@ -1,9 +1,7 @@
 package org.apache.spark.hbase
 
-import java.util
-
 import org.apache.hadoop.hbase.client._
-import org.apache.hadoop.hbase.filter.{FilterBase, FilterList, FuzzyRowFilter}
+import org.apache.hadoop.hbase.filter.{Filter, FilterList}
 
 /**
  * Created by mharis on 05/08/15.
@@ -14,12 +12,13 @@ trait HBaseFilter extends Serializable {
 
 }
 
+
 class HBaseQuery(query: Query) {
-  def addFilter(filter: FuzzyRowFilter): Unit = {
+  def addFilter(filter: Filter): Unit = {
     query.getFilter match {
       case null => query.setFilter(filter)
       case chain: FilterList => chain.addFilter(filter)
-      case one: FilterBase => query.setFilter(new FilterList(one, filter))
+      case one: Filter => query.setFilter(new FilterList(FilterList.Operator.MUST_PASS_ALL, one, filter))
     }
   }
 

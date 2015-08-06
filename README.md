@@ -3,7 +3,7 @@ This is a generic extension of spark for efficient scanning, joining and mutatin
 This library can be used in 3 major ways:
 - __Basic__: In the most basic case it can be used to simply map existing hbase tables to HBaseRDD which will result a simple pair RDD[(Array[Byte], hbase.client.Result)]. These can be filtered, transformed,.. as any other RDD and the result can be for example given to HBaseTable as a mutation to execute on the same underlying table.
 - __Standard__: In the more typical case, by extending HBaseTable to provide mapping of raw key bytes and hbase result to some more meaningful types. You can learn about this method in the Concepts section below and by studying the example source of the demo-simple application
-- __Specialised/Experimental__: Using the keyspace extension to the basic HBaseRDD and HBaseTable. This extension cannot be used on existing tables because it uses predefined key structure which aims to get the most from both spark and hbase perspective. You can learn more about this method by studying the demo-graph application (the demo is broken in the TODOs below)
+- __Specialised/Experimental__: Using the keyspace package to the basic HBaseRDD and HBaseTable. This package cannot be used on existing tables because it uses predefined key structure which aims to get the most from both spark and hbase perspective. You can learn more about this method by studying the demo-graph application (the demo is broken in the TODOs below)
 
 # Concepts
 
@@ -203,5 +203,6 @@ You can then run the demo appliation as a shell:
 - Write more comprehensive tutorial, generating larger table, writing a distributed algorithm over one column family and bulk-loading the result mutation into the second column family.
 - Add implicit Ordering[K] for all HBaseRDD representations since HBase is ordered by definition
 - investigate table.rdd.mapValues(Tags).collect.foreach(println) => WARN ClosureCleaner: Expected a closure; got org.apache.spark.hbase.examples.simple.HBaseTableSimple$$anon$2, while table.select(Tags) works fine
+- multiple transformations over the same result could be optimised as long as they all use the cell scanner - but some transformations access columns directly so maybe too awkward to abstract
 
 
