@@ -197,11 +197,13 @@ You can then run the demo appliation as a shell:
 `./scripts/demo-graph-shell`
 
 # TODOs
-- fix spark-submit script and add an example into the simple demo
+- fixme: update on HBaseTable task size is 250k - something unnecessary is getting serialised
+- fixme: warning: there were 1 deprecation warning(s); re-run with -deprecation for details
+- spark-submit script and add an example into the simple demo
 - figure out a work-around for the bulk operations requiring the process to run under hbase user
-- Mechanism for choosing HBaseJoin implementation must be done per operation, not simply configuration variable because the type of join depends on the relative volume of the RDDs not location or resource - but ideally it should be done by estimation, not requiring any control argument
-- Write more comprehensive tutorial, generating larger table, writing a distributed algorithm over one column family and bulk-loading the result mutation into the second column family.
-- Add implicit Ordering[K] for all HBaseRDD representations since HBase is ordered by definition
+- mechanism for choosing HBaseJoin implementation must be done per operation, not simply configuration variable because the type of join depends on the relative volume of the RDDs not location or resource - but ideally it should be done by estimation, not requiring any control argument
+- write more comprehensive tutorial, generating larger table, writing a distributed algorithm over one column family and bulk-loading the result mutation into the second column family.
+- add implicit Ordering[K] for all HBaseRDD representations since HBase is ordered by definition
 - investigate table.rdd.mapValues(Tags).collect.foreach(println) => WARN ClosureCleaner: Expected a closure; got org.apache.spark.hbase.examples.simple.HBaseTableSimple$$anon$2, while table.select(Tags) works fine
 - multiple transformations over the same result could be optimised as long as they all use the cell scanner - but some transformations access columns directly so maybe too awkward to abstract
 
