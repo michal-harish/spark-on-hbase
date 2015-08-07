@@ -87,7 +87,7 @@ class DemoSimpleApp(sc: SparkContext) {
 
   def join = {
     println("> val area = table.select(TLong(\"F:width\"), TLong(\"F:height\")).sample(0.01).mapValues { case (w, h) => w * h }")
-    println("> table.select(table.Tags).join(other).collect.foreach(println)")
+    println("> table.select(table.Tags).join(area).collect.foreach(println)")
     val area = table.select(TLong("F:width"), TLong("F:height")).sample(0.01).mapValues { case (w, h) => w * h }
     table.select(table.Tags).join(area).collect.foreach(println)
   }

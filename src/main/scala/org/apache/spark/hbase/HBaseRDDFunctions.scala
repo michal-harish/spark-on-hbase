@@ -23,7 +23,7 @@ import scala.reflect.ClassTag
  * TODO make sure we understand what self.withScope does
  */
 
-class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt: ClassTag[V]) extends Serializable {
+class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt: ClassTag[V]) {
 
   def filter(f: TransformationFilter[_]) = new HBaseRDDFiltered[K, V](self, new HBaseFilter {
     override def configureQuery(query: HBaseQuery): Unit = f.configureQuery(query)
