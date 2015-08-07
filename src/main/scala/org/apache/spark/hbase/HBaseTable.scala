@@ -37,7 +37,7 @@ import scala.reflect.ClassTag
  * .bulkDelete
  */
 abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tableNameAsString: String)
-  extends Serializable with KeyTransformation[K] {
+  extends Serializable with KeySerDe[K] {
 
   type HBaseResultFunction[X] = Function[Result, X]
 
@@ -47,7 +47,7 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   val numberOfRegions = Utils.getNumberOfRegions(hbaseConf, tableNameAsString)
 
-  @transient val partitioner = new RegionPartitioner(numberOfRegions)
+  @transient val partitioner = new RegionPartitioner(numberOfRegions, this)
 
   def rdd()(implicit k: ClassTag[K]): HBaseRDD[K, Result] = rdd((result: Result) => result)
 
@@ -106,7 +106,9 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
             val put = new Put(keyToBytes(key))
             put.setDurability(Durability.SKIP_WAL)
             f.applyInverse(value, put)
-            table.mutate(put)
+            if (!put.isEmpty) {
+              table.mutate(put)
+            }
           }
         }
         table.close

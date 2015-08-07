@@ -10,4 +10,6 @@ abstract class ColumnTransformation[V](private val column: String) extends Trans
 
   val Array(family:Array[Byte], qualifier:Array[Byte]) = column.split(":").map(Bytes.toBytes(_))
 
+  //TODO def equals(value: V) = new ColumnTransformationEquals[V](this, value)
+
 }

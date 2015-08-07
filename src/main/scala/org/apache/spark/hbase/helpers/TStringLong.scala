@@ -6,7 +6,7 @@ import org.apache.hadoop.hbase.util.Bytes
 /**
  * Created by mharis on 06/08/15.
  */
-case class TStringLong(cf: String) extends ColumnFamilyTransformation[String, Long](cf) {
+case class TStringLong(cf: String) extends FamilyTransformation[String, Long](cf) {
 
   override def applyCell(cell: Cell): (String, Long) = {
     val key = Bytes.toString(cell.getQualifierArray, cell.getQualifierOffset, cell.getQualifierLength)

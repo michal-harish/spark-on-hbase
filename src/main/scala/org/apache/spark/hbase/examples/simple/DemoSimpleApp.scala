@@ -1,8 +1,13 @@
 package org.apache.spark.hbase.examples.simple
 
+import java.util.UUID
+
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.Utils
 import org.apache.spark.hbase.helpers.TLong
+import org.apache.spark.rdd.RDD
+
+import scala.util.Random
 
 /**
  * Created by mharis on 28/07/15.
@@ -20,8 +25,7 @@ class DemoSimpleApp(sc: SparkContext) {
     println("Spark-on-HBase Simple Demo shell help:")
     println(" help - print this usage information")
     println(" table - main example instance of the HBaseTableSimple `demo-simple`")
-    println(" collect <RDD> - collet and print the given rdd fully")
-    println(" update  - put example data into the underlying hbase table `demo-simple` using Transformation")
+    println(" generate  - put 1000 random rows into the underlying hbase table `demo-simple` using Transformation")
     println(" collect - collect all data from the demo table")
     println(" collectNumCells - count number of cells per row in a specialised HBaseRDD[String, Short]")
     println(" collectFeatures - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Long]]")
@@ -29,30 +33,26 @@ class DemoSimpleApp(sc: SparkContext) {
     println(" collectTags - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Double]]")
     println(" collectTagsAndFeatures - collect both column families T and F from the demo table and map it to specialised HBaseRDD[String, (List[String], Map[String,Double])]")
     println(" join - example join")
-    println(" rightOuterJoin - example rightOuterJoin")
     println(" filter - example transformation filter")
   }
 
-  def update = {
-    println("Updating `demo-simple` column family `F` - Features")
+  def generate = {
 
-    table.update(table.Features, sc.parallelize(Array(
-      "row1" -> Map("height" -> 50L, "width" -> 100L),
-      "row2" -> Map("height" -> 90L, "width" -> 300L)
-    )))
+    val r = new Random
+    val possibleTags = Set("lego", "music", "cars", "cinema", "sport")
+
+    val data: RDD[(UUID, Map[String, Long], Set[String])] = sc.parallelize(for (i <- (1 to 1000)) yield {
+      (UUID.randomUUID(),
+        Map("width" -> ((r.nextGaussian * 50) + 1000).toLong, "height" -> ((r.nextGaussian * 50) + 1000).toLong),
+        possibleTags.filter(x => r.nextBoolean))
+    })
+
+    println("Updating `demo-simple` column family `F` - Features")
+    table.update(table.Features, data.map { case (key, features, tags) => (key, features) })
 
     println("Updating `demo-simple` column family `T` - Tags")
-    table.update(table.Tags, sc.parallelize(Array(
-      "row1" -> List("lego", "music", "motorbike"),
-      "row2" -> List("cinema")
-    )))
+    table.update(table.Tags, data.map { case (key, features, tags) => (key, tags) })
 
-    println("Updating `demo-simple` column `F:height`")
-    table.update(TLong("F:height"), sc.parallelize(Array(
-      "row1" -> 55L,
-      "row2" -> 95L,
-      "row3" -> 99L
-    )))
   }
 
   def collect = {
@@ -86,17 +86,10 @@ class DemoSimpleApp(sc: SparkContext) {
   }
 
   def join = {
-    println("> val other = sc.parallelize(Array(\"row1\" -> \"Moo\", \"row2\" -> \"Foo\", \"row3\" -> \"Bar\"))")
+    println("> val area = table.select(TLong(\"F:width\"), TLong(\"F:height\")).sample(0.01).mapValues { case (w, h) => w * h }")
     println("> table.select(table.Tags).join(other).collect.foreach(println)")
-    val other = sc.parallelize(Array("row1" -> "Moo", "row2" -> "Foo", "row3" -> "Bar"))
-    table.select(table.Tags).join(other).collect.foreach(println)
-  }
-
-  def rightOuterJoin = {
-    println("> val other = sc.parallelize(Array(\"row1\" -> \"Moo\", \"row2\" -> \"Foo\", \"row3\" -> \"Bar\"))")
-    val other = sc.parallelize(Array("row1" -> "Moo", "row2" -> "Foo", "row3" -> "Bar"))
-    println("> table.select(table.Tags).rightOuterJoin(other).collect.foreach(println)")
-    table.select(table.Tags).rightOuterJoin(other).collect.foreach(println)
+    val area = table.select(TLong("F:width"), TLong("F:height")).sample(0.01).mapValues { case (w, h) => w * h }
+    table.select(table.Tags).join(area).collect.foreach(println)
   }
 
   def filter = {

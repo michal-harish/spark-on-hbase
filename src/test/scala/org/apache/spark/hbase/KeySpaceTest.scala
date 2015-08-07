@@ -15,13 +15,17 @@ class KeySpaceTest extends FlatSpec with Matchers {
 
   val random = new Random
   val numPartitions = 32
-  val partitioner = new RegionPartitioner(numPartitions)
 
   implicit val TestKeySpaceReg: KSREG = Map(
     new KeySpaceLong("l").keyValue,
     new KeySpaceLongPositive("lp").keyValue,
     new KeySpaceUUID("u").keyValue
   )
+
+  val partitioner = new RegionPartitioner[Key](numPartitions, new KeySerDe[Key] {
+    override def bytesToKey = (bytes: Array[Byte]) => Key(bytes)
+    override def keyToBytes = (key: Key) => key.bytes
+  })
 
   behavior of "KeySpaceLong"
   it should "have even distribution when partitioned by RegionPartitioner" in {

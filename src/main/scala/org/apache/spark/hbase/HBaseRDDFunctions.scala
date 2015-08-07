@@ -3,7 +3,7 @@ package org.apache.spark.hbase
 import java.util
 
 import org.apache.hadoop.hbase.client._
-import org.apache.hadoop.hbase.filter.{NullComparator, CompareFilter, SingleColumnValueFilter, SkipFilter}
+import org.apache.hadoop.hbase.filter._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{HConstants, TableName}
 import org.apache.spark.hbase.helpers.TransformationFilter
@@ -41,6 +41,12 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
       if (minStamp != HConstants.OLDEST_TIMESTAMP || maxStamp != HConstants.LATEST_TIMESTAMP) {
         query.setTimeRange(minStamp, maxStamp)
       }
+    }
+  })
+
+  def sample(probability: Double) = new HBaseRDDFiltered[K,V](self, new HBaseFilter() {
+    override def configureQuery(query: HBaseQuery): Unit = {
+      query.addFilter(new RandomRowFilter(probability.toFloat))
     }
   })
 

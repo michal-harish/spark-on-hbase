@@ -107,7 +107,7 @@ object Utils {
     val connection = ConnectionFactory.createConnection(hbaseConf)
     val admin = connection.getAdmin
     val tableName = TableName.valueOf(tableNameAsString)
-    val partitioner = new RegionPartitioner(numRegions)
+    val partitioner = new RegionPartitioner[Array[Byte]](numRegions, null)
     try {
       if (!admin.tableExists(tableName)) {
         println("CREATING TABLE " + tableNameAsString)
@@ -148,7 +148,7 @@ object Utils {
     val destTableNameAsString = dest.tableNameAsString
     val updateCount = sc.accumulator(0L, "HBaseTable copy utility counter")
     println(s"HBaseTable COPYING ${srcTableNameAsString} TO ${destTableNameAsString}")
-    val srcTransformed = src.rdd.partitionBy(new RegionPartitioner(dest.numberOfRegions))
+    val srcTransformed = src.rdd.partitionBy(new RegionPartitioner(dest.numberOfRegions, dest))
     srcTransformed.foreachPartition(part => {
       val connection = ConnectionFactory.createConnection(broadCastConf.value)
       val destTable = connection.getBufferedMutator(TableName.valueOf(destTableNameAsString))

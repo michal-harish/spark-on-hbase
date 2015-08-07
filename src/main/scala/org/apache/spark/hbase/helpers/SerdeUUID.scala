@@ -2,12 +2,12 @@ package org.apache.spark.hbase.helpers
 
 import java.util.UUID
 
-import org.apache.spark.hbase.{ByteUtils, KeyTransformation}
+import org.apache.spark.hbase.{ByteUtils, KeySerDe}
 
 /**
  * Created by mharis on 06/08/15.
  */
-trait KeyUUID extends KeyTransformation[UUID] {
+trait SerdeUUID extends KeySerDe[UUID] {
   final override def keyToBytes = (key: UUID) => {
     val bytes = new Array[Byte](16)
     ByteUtils.putLongValue(key.getMostSignificantBits, bytes, 0)

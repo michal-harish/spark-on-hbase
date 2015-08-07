@@ -6,10 +6,9 @@ package org.apache.spark.hbase
 
 import org.apache.hadoop.hbase.KeyValue
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark.hbase.keyspace.Key
 import org.apache.spark.Partitioner
 
-class RegionPartitioner(val numRegions: Int) extends Partitioner {
+class RegionPartitioner[K](val numRegions: Int, private val kt: KeySerDe[K]) extends Partitioner {
 
   private val minValue: Array[Byte] = ByteUtils.parseUUID("00000000-0000-0000-0000-000000000000")
   private val maxValue: Array[Byte] = ByteUtils.parseUUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
@@ -25,7 +24,7 @@ class RegionPartitioner(val numRegions: Int) extends Partitioner {
   override def numPartitions = numRegions
 
   override def equals(other: Any): Boolean = other match {
-    case h: RegionPartitioner => h.numPartitions == numPartitions
+    case h: RegionPartitioner[K] => h.numPartitions == numPartitions
     case _ => false
   }
 
@@ -33,11 +32,9 @@ class RegionPartitioner(val numRegions: Int) extends Partitioner {
 
   override def getPartition(key: Any): Int = {
     key match {
-      case keyValue: KeyValue => findRegion(keyValue.getRowArray, keyValue.getRowOffset, keyValue.getRowLength)
-      case key: Key => findRegion(key.bytes)
       case a: Array[Byte] if a.length > 0 => findRegion(a)
-      case s: String if (s.length > 0) => findRegion(ByteUtils.reverse(s.getBytes))
-      case _ => throw new IllegalArgumentException("RegionPartitioner only supports KeyValue, Key, String and Array[Byte] keys")
+      case keyValue: KeyValue => findRegion(keyValue.getRowArray, keyValue.getRowOffset, keyValue.getRowLength)
+      case _ => findRegion(kt.keyToBytes(key.asInstanceOf[K]))
     }
   }
 

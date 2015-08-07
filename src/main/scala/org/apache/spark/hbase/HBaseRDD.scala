@@ -5,7 +5,7 @@ import org.apache.hadoop.hbase.client._
 import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
 import org.apache.spark._
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.hbase.helpers.KeyDefault
+import org.apache.spark.hbase.helpers.SerdeDefault
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -16,13 +16,13 @@ import scala.reflect.ClassTag
 
 abstract class HBaseRDD[K, V](@transient val sc: SparkContext
                               , val tableNameAsString: String
-                              , val filters: Seq[HBaseFilter]) extends RDD[(K, V)](sc, Nil) with KeyTransformation[K] {
+                              , val filters: Seq[HBaseFilter]) extends RDD[(K, V)](sc, Nil) with KeySerDe[K] {
 
   @transient private val tableName = TableName.valueOf(tableNameAsString)
   @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
   protected val configuration = new SerializableWritable(hbaseConf)
   protected val regionSplits: Array[(Array[Byte], Array[Byte])] = Utils.getRegionSplits(hbaseConf, tableName)
-  @transient override val partitioner: Option[Partitioner] = Some(new RegionPartitioner(regionSplits.size))
+  @transient override val partitioner: Option[Partitioner] = Some(new RegionPartitioner(regionSplits.size, this))
 
   def resultToValue: Result => V
 
@@ -97,7 +97,7 @@ object HBaseRDD {
   }
 
   def create(sc: SparkContext, tableNameAsString: String, columns: String*) = {
-    new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, Nil) with KeyDefault {
+    new HBaseRDD[Array[Byte], Result](sc, tableNameAsString, Nil) with SerdeDefault {
       override def resultToValue = (result: Result) => result
     }.select(columns: _*)
   }

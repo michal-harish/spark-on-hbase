@@ -101,10 +101,8 @@ with AGraph[HE] {
   @transient
   val schema = List(
       Utils.column("N", true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
-    , Utils.column("E", true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
-    , Utils.column("F", false, 86400 * 90, BloomType.ROWCOL, 1, Algorithm.SNAPPY, 64 * 1024))
+    , Utils.column("E", true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024))
 
-  type FEATURES = Map[String, Array[Byte]]
   type STATS = LinkedHashMap[String, Accumulator[Long]]
 
 
@@ -112,21 +110,7 @@ with AGraph[HE] {
   val propsFile = new Path(s"/hgraph/${tableName}") //TODO configurable path for hgraph properties
   val props = scala.collection.mutable.LinkedHashMap[String, String]()
 
-  val CFRFeatures = (row: Result) => {
-    val featureMapBuilder = Map.newBuilder[String, Array[Byte]]
-    val scanner = row.cellScanner
-    val cfFeatures = Bytes.toBytes("F")
-    while (scanner.advance) {
-      val kv = scanner.current
-      if (Bytes.equals(kv.getFamilyArray, kv.getFamilyOffset, kv.getFamilyLength, cfFeatures, 0, cfFeatures.length)) {
-        val feature = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
-        val value = CellUtil.cloneValue(kv)
-        featureMapBuilder += ((feature, value))
-      }
-    }
-    featureMapBuilder.result
-  }
-
+  //TODO Transformation[Seq[EDGE]]
   val CFREdges = (row: Result) => {
     val edgeSeqBuilder = Seq.newBuilder[(Key, HE)]
     val scanner = row.cellScanner
@@ -167,47 +151,6 @@ with AGraph[HE] {
     val stream = new BufferedWriter(new OutputStreamWriter(fs.create(propsFile, true)))
     props.map(x => s"${x._1}=${x._2}").toSeq.foreach(line => stream.write(line + "\r\n"))
     stream.close
-  }
-
-  //TODO rebuild Features with ResultFunction
-  def rddFeatures: LAYER[FEATURES] = {
-    rdd(KeySpace("d")).select("F").mapValues(CFRFeatures)
-  }
-
-  def rddFeatures[T](feature: String)(implicit tag: ClassTag[T]): LAYER[T] = {
-    val cfFeatures = Bytes.toBytes("F")
-    val fFeature = Bytes.toBytes(feature)
-    val t: ((Result) => T) = tag.runtimeClass match {
-      case java.lang.Long.TYPE => (row: Result) => Bytes.toLong(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
-      case java.lang.Double.TYPE => (row: Result) => Bytes.toDouble(row.getValue(cfFeatures, fFeature)).asInstanceOf[T]
-      case _ => throw new UnsupportedOperationException(tag.runtimeClass.toString)
-    }
-    val filtered = rdd((result: Result) => result, KeySpace("d")).select("F")
-      .filter(_._2.containsNonEmptyColumn(cfFeatures, fFeature))
-    filtered.mapPartitions(rows => rows.map({ case (key, values) => (key, t(values)) }), preservesPartitioning = true)
-  }
-
-  def updateFeatures[T](x: LAYER[(String, T)])(implicit tag: ClassTag[T]) = {
-    val t: (T => Array[Byte]) = tag.runtimeClass match {
-      case java.lang.Long.TYPE => (value: T) => Bytes.toBytes(value.asInstanceOf[Long])
-      case java.lang.Double.TYPE => (value: T) => Bytes.toBytes(value.asInstanceOf[Double])
-      case _ => throw new UnsupportedOperationException
-    }
-    put(Bytes.toBytes("F"), x.mapValues(f => (Map(Bytes.toBytes(f._1) ->(t(f._2), HConstants.LATEST_TIMESTAMP)))))
-  }
-
-  def updateFeatures[T](feature: String, x: LAYER[T])(implicit tag: ClassTag[T]) = {
-    val fFeature = Bytes.toBytes(feature)
-    val t: (T => Array[Byte]) = tag.runtimeClass match {
-      case java.lang.Long.TYPE => (value: T) => Bytes.toBytes(value.asInstanceOf[Long])
-      case java.lang.Double.TYPE => (value: T) => Bytes.toBytes(value.asInstanceOf[Double])
-      case _ => throw new UnsupportedOperationException
-    }
-    put(Bytes.toBytes("F"), x.mapValues(f => (Map(fFeature ->(t(f), HConstants.LATEST_TIMESTAMP)))))
-  }
-
-  def incFeature(feature: String, incRdd: LAYER[Long]) {
-    super.increment(Bytes.toBytes("F"), Bytes.toBytes(feature), incRdd)
   }
 
   def copyNet(dest: HGraphTable, closeContextOnExit: Boolean = false): Long = {

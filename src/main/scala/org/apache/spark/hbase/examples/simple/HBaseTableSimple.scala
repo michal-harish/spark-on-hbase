@@ -1,5 +1,7 @@
 package org.apache.spark.hbase.examples.simple
 
+import java.util.UUID
+
 import org.apache.hadoop.hbase.client.{Put, Result}
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
@@ -29,7 +31,7 @@ object HBaseTableSimple {
 }
 
 class HBaseTableSimple(sc: SparkContext, tableNameAsString: String)
-  extends HBaseTable[String](sc, tableNameAsString) with KeyString {
+  extends HBaseTable[UUID](sc, tableNameAsString) with SerdeUUID {
 
 
   //predefined column family transformation can be declared for shorthand

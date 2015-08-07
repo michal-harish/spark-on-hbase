@@ -1,21 +1,13 @@
 package org.apache.spark.hbase.helpers
 
 import org.apache.hadoop.hbase.filter._
-import org.apache.spark.hbase.{HBaseQuery, Transformation}
+import org.apache.spark.hbase.HBaseQuery
 
 /**
  * Created by mharis on 05/08/15.
- *
- * demo-simple demonstration:
- * table.select(table.Features).filter(table.Features contains "width").collect.foreach(println)
  */
-abstract class TransformationFilter[V](val t: Transformation[_]) extends Serializable {
 
-  def configureQuery(query: HBaseQuery)
-  
-}
-
-class TransformationFilterCONTAINSQUALIFIER[K, V](t: ColumnFamilyTransformation[K,V], key: K)
+class FamilyTransformationContains[K, V](t: FamilyTransformation[K,V], key: K)
   extends TransformationFilter[Map[K,V]](t) {
 
   override def configureQuery(query: HBaseQuery) {

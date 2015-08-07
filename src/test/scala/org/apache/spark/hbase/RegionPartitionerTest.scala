@@ -11,13 +11,7 @@ import org.scalatest.{FlatSpec, Matchers}
  */
 class RegionPartitionerTest extends FlatSpec with Matchers {
 
-  implicit val TestKeySpaceReg: KSREG = Map(
-    new KeySpaceUUID("test").keyValue,
-    new KeySpaceString("d").keyValue
-  )
-
-
-  val p1 = new RegionPartitioner(5)
+  val p1 = new RegionPartitioner[Array[Byte]](5, null)
   println(s"NUM REGIONS ${p1.numRegions}")
   p1.splitKeys.map(_.mkString("|")).foreach(println)
   println(s"HBASE startKey ${p1.startKey.mkString("|")}")
@@ -34,8 +28,16 @@ class RegionPartitionerTest extends FlatSpec with Matchers {
   p1.getPartition(ByteUtils.parseUUID("ffffffff-ffff-ffff-ffff-fffffffffffe")) should be(4)
   p1.getPartition(ByteUtils.parseUUID("ffffffff-ffff-ffff-ffff-ffffffffffff")) should be(4)
 
+  implicit val TestKeySpaceReg: KSREG = Map(
+    new KeySpaceUUID("test").keyValue,
+    new KeySpaceString("d").keyValue
+  )
+
   val numRegions = 512
-  val p = new RegionPartitioner(numRegions)
+  val p = new RegionPartitioner[Key](numRegions,  new KeySerDe[Key] {
+    override def bytesToKey = (bytes: Array[Byte]) => Key(bytes)
+    override def keyToBytes = (key: Key) => key.bytes
+  })
 
 
   val v0 = Key("test", "f81d4fae-7dec-11d0-a765-00a0c91e6bf6")

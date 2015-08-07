@@ -65,14 +65,14 @@ trait AGraph[PROPS <: Props[PROPS]] {
    */
   final def histogram(network: NETWORK): Array[(Long, Long)] = hist(network.mapValues(_.size))
 
-  final def frequency(pairs: PAIRS)(implicit partitioner: RegionPartitioner): LAYER[Long] = {
+  final def frequency(pairs: PAIRS)(implicit partitioner: RegionPartitioner[_]): LAYER[Long] = {
     reverse(pairs).aggregateByKey(0L, partitioner)((u, v) => u + 1L, (u1, u2) => u1 + u2)
   }
 
   /**
    * From undirected pairs creates a REDUNDANT directed network graph
    */
-  final def fromPairs(in: PAIRS)(implicit partitioner: RegionPartitioner): NETWORK = group(reverse(in))
+  final def fromPairs(in: PAIRS)(implicit partitioner: RegionPartitioner[_]): NETWORK = group(reverse(in))
 
   /**
    * Reverse given pairs and double the footprint
@@ -85,7 +85,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
    * this effectively performs a 1-step connected components BSP on an entire network -
    * not efficient as netBSP but useful for small validation sets and incremental batches
    */
-  final def bsp(in: NETWORK)(implicit partitioner: RegionPartitioner): NETWORK = {
+  final def bsp(in: NETWORK)(implicit partitioner: RegionPartitioner[_]): NETWORK = {
     deduplicate(in.flatMap { case (key, edges) => {
       (for (edge <- edges) yield ((edge._1, edges.filter(_._1 != edge._1)))) :+(key, edges)
     }
@@ -95,7 +95,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
   /**
    * Removes extremely inter-connected groups built from a set of pairs
    */
-  final def cutoff(pairs: PAIRS, cutOffThreshold: Double = 0.05)(implicit partitioner: RegionPartitioner): PAIRS = {
+  final def cutoff(pairs: PAIRS, cutOffThreshold: Double = 0.05)(implicit partitioner: RegionPartitioner[_]): PAIRS = {
     val freq = frequency(pairs).persist(MEMORY_AND_DISK_SER)
     try {
       val h = hist(freq)
@@ -115,7 +115,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
   /*
    * group - deduplicate a network directly from PAIRS
    */
-  final def group(pairs: PAIRS)(implicit partitioner: RegionPartitioner): NETWORK = deduplicate(pairs.mapValues(Seq(_)))
+  final def group(pairs: PAIRS)(implicit partitioner: RegionPartitioner[_]): NETWORK = deduplicate(pairs.mapValues(Seq(_)))
 
   /**
    * combines all occurrences of the same vertex id into a network of unique vertices with combined and deduplicated edges
@@ -123,7 +123,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
    * WARNING: because it is a merge sort, the individual edge sequences are expected to be already sorted
    * the input net RDD doesn't have to be sorted by key but the EDGES within each row MUST be sorted
    */
-  final def deduplicate(net: NETWORK)(implicit partitioner: RegionPartitioner): NETWORK = {
+  final def deduplicate(net: NETWORK)(implicit partitioner: RegionPartitioner[_]): NETWORK = {
     val mergeSortAscending = (g: Iterable[EDGES]) => {
 
       if (g.size == 1) {
@@ -231,7 +231,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
    * Simple EXPAND takes a pool of vertices and expands it through the given graph network
    * and returns an expanded pool of vertex pairs: in each 1. unique vertex and 2. highest connected vertex
    */
-  final def expand(net: NETWORK, users: POOL)(implicit partitioner: RegionPartitioner): POOL = {
+  final def expand(net: NETWORK, users: POOL)(implicit partitioner: RegionPartitioner[_]): POOL = {
     users.leftOuterJoin(net, partitioner).flatMap({ case (key, (maxEdge, netEdges)) => {
       netEdges match {
         case Some(edges) if (edges.length > 0) => {
@@ -244,7 +244,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
     }).reduceByKey(partitioner, (a, b) => Key.higher(a, b))
   }
 
-  final def profile[X](users: POOL, profile: LAYER[X])(implicit partitioner: RegionPartitioner): RDD[(Key, (Key, X))] = {
+  final def profile[X](users: POOL, profile: LAYER[X])(implicit partitioner: RegionPartitioner[_]): RDD[(Key, (Key, X))] = {
     users.join(profile, partitioner)
   }
 
@@ -252,7 +252,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
    * expand - expands the pool of ids using the network's connectivity into a new list
    * and do a straight join on available profile
    */
-  final def expand[X](net: NETWORK, pool: POOL, profile: LAYER[X])(implicit partitioner: RegionPartitioner): RDD[(Key, (Key, X))] = {
+  final def expand[X](net: NETWORK, pool: POOL, profile: LAYER[X])(implicit partitioner: RegionPartitioner[_]): RDD[(Key, (Key, X))] = {
     expand(net, pool).join(profile, partitioner)
   }
 
@@ -262,7 +262,7 @@ trait AGraph[PROPS <: Props[PROPS]] {
    * but unlike the expand it then joins the expanded profile on the original unexpanded pool
    */
   final def innerExpand[X](net: NETWORK, pool: POOL, profile: LAYER[X] /*, combiner: (X,X) => X*/)
-                          (implicit t: ClassTag[X], partitioner: RegionPartitioner): RDD[(Key, (Key, X))] = {
+                          (implicit t: ClassTag[X], partitioner: RegionPartitioner[_]): RDD[(Key, (Key, X))] = {
     val exp: POOL = expand(net, pool)
     exp.collect.foreach(x => println(s"EXPANDED POOL ${x}"))
     val expandedProfile = exp.join(profile, partitioner)
