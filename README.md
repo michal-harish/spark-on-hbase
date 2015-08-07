@@ -131,7 +131,16 @@ val documents = new HBaseTable[UUID](sc, "my_documents_table") {
 ```
 
 Above we have created (and implemented) a fully working HBaseTable instance with 2 trasnformations available that
-can be used to read and write the data as typed RDD. We can for exmple do the following:
+can be used to read and write the data as typed RDD. The transformations in the above class are implemented from scratch here but there are some standard transformations and key serdes available in the helpers package so the shorter version could look like this:
+
+```
+val documents = new HBaseTable[UUID](sc, "my_documents_table") with SerdeUUID {
+    val Content = TString("C:body")
+    val Spelling = TString("A:spelling")
+}
+```
+
+We can now for exmple do the following:
 
 ```
 val dictionary: RDD[String] ... //contains a dictionary of known enlgish words
@@ -140,43 +149,60 @@ val docWords: RDD[(UUID, Seq[String])] = documents.select(documents.Content).map
 
 val words = content.flatMap{ case (uuid, words) => words.map(word => (word, uuid))}
 
-val misspelled = words.subtract(dictionary).map{ case (word, uuid) => (uuid, word) }.groupByKey
+val unknown = words.leftOuterJoin(dictionary.mapValues(d => (d, "known"))).filter(_._2._2.isEmpty).mapValues(_._1)
 
-documents.update(documents.Spelling, misspelled.mapValues(_.mkString(",")))
+val docWordsUnknown = unknown.map{ case (word, uuid) => (uuid, word) }.groupByKey
+
+documents.update(documents.Spelling, docWordsUnknown.mapValues(_.mkString(",")))
 ```
 
-The code above will find all misspelled words in each document's content and update the `misspelled` attribute with a their coma-separated list. 
+The code above will find all misspelled words in each document's content and update the `misspelled` attribute with a their coma-separated list, in a fully distributed way of course.
 
-If we wanted to access and update the whole column family 'A' as a Map[String,String] of Attribute-Value pairs, we could add another transformation to the table:
-
+If we wanted to access and update the whole column family 'A' as a Map[String,String] of Attribute-Value pairs, we could add another transformation to the table, this time we will use slightly higher level FamilyTransformation which is an extension of the abstract Transformation that maps entire column family to a Map[K,V] in this case Map[String,String] of document's name-value attributes
 ```
     ...
-    val Attributes = new Transformation[Map[String,String]]("A") {
-
-        override def apply(result: Result): Map[String, Double] = {
-          val builder = Map.newBuilder[String, String]
-          val scanner = result.cellScanner
-          while (scanner.advance) {
-            val kv = scanner.current
-            if (CellUtil.matchingFamily(kv, A)) {
-              val attr = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
-              val value = Bytes.toString(kv.getValueArray, kv.getValueOffset)
-              builder += ((attr, value))
-            }
-          }
-          builder.result
+    val Attributes = new FamilyTransformation[String, String]("A") {
+        override def applyCell(kv: Cell): (String, String) = {
+          val attr = Bytes.toString(kv.getQualifierArray, kv.getQualifierOffset, kv.getQualifierLength)
+          val value = Bytes.toString(kv.getValueArray, kv.getValueOffset)
+          (attr, value)
         }
-
-        override def applyInverse(value: Map[String, String], mutation: Put) {
-          value.foreach { case (attr, value) => {
-            mutation.addColumn(F, Bytes.toBytes(attr), Bytes.toBytes(value))
-          }}
+    
+        override def applyCellInverse(attr: String, value: String): (Array[Byte], Array[Byte]) = {
+          (Bytes.toBytes(attr), Bytes.toBytes(value))
         }
     }
     ...
 ```
 
-# example 3 - bulk operations in practice
+There are also some standard ColumnFamilyTransformation helpers like TStringDouble TStringLong and TStringString which map the whole column to a Map[String,Double], Map[Stirng,Long] and Map[String,String] respectively so the Attributes above can also be also declared as:
+
+```
+    ...
+    val Attributes = TStringString("A")
+    ...
+```
+
+And since TStringString is a case class Transformation it can be in fact used directly in select, filter and update statements without declaring it as a val of the table class:
+
+```
+    documents.select(TStringString("A"))    
+    //is same as
+    documents.select(documents.Attributes)
+    //both statements above return an HBaseRDD[UUID, Map[String,String]] or RDD[(UUID, Map[String,String])]
+
+```
+
+Using Transformations in filter statments is very efficient because they are pushed down to the region servers and are very clean however at the moment only few predicates are implemented:
+
+```
+documents.select(documents.Content).filter(TStringString("A") contains "misspelled")
+```
+
+
+
+
+# example 4 - bulk operations in practice
 TODO section about bulk-loading the documents from some hdfs data and large-scale join and transformation all the way from launching the spark job as hbase user.
 
 # example 5 - experimental stuff
