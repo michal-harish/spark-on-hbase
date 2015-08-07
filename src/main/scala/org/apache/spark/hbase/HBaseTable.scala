@@ -37,7 +37,7 @@ import scala.reflect.ClassTag
  * .bulkDelete
  */
 abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tableNameAsString: String)
-  extends Serializable with KeySerDe[K] {
+  extends Serializable with Serde[K] {
 
   type HBaseResultFunction[X] = Function[Result, X]
 
@@ -53,9 +53,9 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   protected def rdd[V](valueMapper: (Result) => V): HBaseRDD[K, V] = {
     new HBaseRDD[K, V](sc, tableNameAsString, Nil) {
-      override def bytesToKey = HBaseTable.this.bytesToKey
+      override def fromBytes = HBaseTable.this.fromBytes
 
-      override def keyToBytes = HBaseTable.this.keyToBytes
+      override def toBytes = HBaseTable.this.toBytes
 
       override def resultToValue = valueMapper
     }
@@ -103,7 +103,7 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
         val table = connection.getBufferedMutator(TableName.valueOf(tableNameAsString))
         partition.foreach {
           case (key, value) => {
-            val put = new Put(keyToBytes(key))
+            val put = new Put(toBytes(key))
             put.setDurability(Durability.SKIP_WAL)
             f.applyInverse(value, put)
             if (!put.isEmpty) {
@@ -130,7 +130,7 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
         var partCount = 0L
         part.foreach {
           case (key, cells) => if (cells.size > 0) {
-            val put = new Put(keyToBytes(key))
+            val put = new Put(toBytes(key))
             put.setDurability(Durability.SKIP_WAL)
             cells.foreach({
               case (qualifier, (value, timestamp)) => {
@@ -154,7 +154,7 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
   def increment(family: Array[Byte], qualifier: Array[Byte], incrementRdd: RDD[(K, Long)])(implicit tag: ClassTag[K]) {
     val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
-    val keyToBytes = this.keyToBytes
+    val keyToBytes = this.toBytes
     incrementRdd.partitionBy(partitioner).foreachPartition(part => {
       val connection = ConnectionFactory.createConnection(broadCastConf.value)
       val table = connection.getTable(TableName.valueOf(tableNameAsString))
@@ -179,7 +179,7 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
     val broadCastConf = new SerializableWritable(hbaseConf)
     val tableNameAsString = this.tableNameAsString
     val toDeleteCount = sc.accumulator(0L, "HGraph Net Delete Counter1")
-    val keyToBytes = this.keyToBytes
+    val keyToBytes = this.toBytes
     deleteRdd.partitionBy(partitioner).foreachPartition(part => {
       val connection = ConnectionFactory.createConnection(broadCastConf.value)
       val mutator = connection.getBufferedMutator(TableName.valueOf(tableNameAsString))
@@ -232,7 +232,7 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   def bulkLoad(family: Array[Byte], bulkRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])], completeAsync: Boolean): Long = {
     val acc = sc.accumulator(0L, s"HBATable ${tableName} load count")
-    val keyToBytes = this.keyToBytes
+    val keyToBytes = this.toBytes
     implicit val keyValueOrdering = KeyValueOrdering
 
     val hfileRdd: RDD[(ImmutableBytesWritable, KeyValue)] = bulkRdd.flatMap { case (key, columnVersions) => {
@@ -255,7 +255,7 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
   def bulkDelete(family: Array[Byte], deleteRdd: RDD[(K, Seq[Array[Byte]])], completeAsync: Boolean): Long = {
     val acc = sc.accumulator(0L, s"HBATable ${tableName} delete count")
     val cfs = Utils.getColumnFamilies(hbaseConf, tableNameAsString).map(_.getName)
-    val keyToBytes = this.keyToBytes
+    val keyToBytes = this.toBytes
     implicit val keyValueOrdering = KeyValueOrdering
 
     val hFileRdd: RDD[(ImmutableBytesWritable, KeyValue)] = deleteRdd.flatMap { case (key, qualifiersToDelete) => {

@@ -38,8 +38,8 @@ abstract class HBaseRDDKS[V](sc: SparkContext, tableNameAsString: String, keySpa
 
   def this(sc: SparkContext, tableNameAsString: String)(implicit reg: KSREG) = this(sc, tableNameAsString, (-1.toShort))
 
-  override def bytesToKey = (rowKey: Array[Byte]) => Key(rowKey)
+  override def fromBytes = (rowKey: Array[Byte], o:Int, l: Int) => Key(rowKey) //TODO Key from offset
 
-  override def keyToBytes = (key: Key) => key.bytes
+  override def toBytes = (key: Key) => key.bytes
 
 }

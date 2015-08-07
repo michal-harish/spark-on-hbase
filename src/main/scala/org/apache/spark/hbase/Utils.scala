@@ -157,7 +157,7 @@ object Utils {
         part.foreach {
           case (key, result) => {
             val scanner = result.cellScanner()
-            val put = new Put(src.keyToBytes(key))
+            val put = new Put(src.toBytes(key))
             put.setDurability(Durability.SKIP_WAL)
             while (scanner.advance) {
               val cell = scanner.current

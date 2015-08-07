@@ -8,7 +8,7 @@ import org.apache.hadoop.hbase.KeyValue
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.Partitioner
 
-class RegionPartitioner[K](val numRegions: Int, private val kt: KeySerDe[K]) extends Partitioner {
+class RegionPartitioner[K](val numRegions: Int, private val kt: Serde[K]) extends Partitioner {
 
   private val minValue: Array[Byte] = ByteUtils.parseUUID("00000000-0000-0000-0000-000000000000")
   private val maxValue: Array[Byte] = ByteUtils.parseUUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
@@ -34,7 +34,7 @@ class RegionPartitioner[K](val numRegions: Int, private val kt: KeySerDe[K]) ext
     key match {
       case a: Array[Byte] if a.length > 0 => findRegion(a)
       case keyValue: KeyValue => findRegion(keyValue.getRowArray, keyValue.getRowOffset, keyValue.getRowLength)
-      case _ => findRegion(kt.keyToBytes(key.asInstanceOf[K]))
+      case _ => findRegion(kt.toBytes(key.asInstanceOf[K]))
     }
   }
 

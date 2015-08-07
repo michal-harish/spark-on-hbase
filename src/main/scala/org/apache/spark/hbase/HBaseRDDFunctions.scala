@@ -123,8 +123,6 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
       val tableNameAsString = self.tableNameAsString
       val multiGetSize = maxGetSize
       val multiget = HBaseRDDFunctions.this.multiget
-      val keyToBytes = self.keyToBytes
-      val bytesToKey = self.bytesToKey
       rightSideRdd.mapPartitions(part => {
         val connection = ConnectionFactory.createConnection(broadCastConf.value)
         val table = connection.getTable(TableName.valueOf(tableNameAsString))
@@ -175,13 +173,13 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
               val bufferMap = scala.collection.mutable.Map[K, (V, W)]()
               while (multiGetList.size < multiGetSize && part.hasNext) {
                 val (key, rightSideValue) = part.next
-                multiGetList += keyToBytes(key)
+                multiGetList += self.toBytes(key)
                 bufferMap(key) = ((null.asInstanceOf[V], rightSideValue))
               }
               if (!multiGetList.isEmpty) {
                 multiget(self, table, multiGetList).foreach(row => {
                   if (!row.isEmpty) {
-                    val key = bytesToKey(row.getRow)
+                    val key = self.fromBytes(row.getRow)
                     bufferMap(key) = (self.resultToValue(row), bufferMap(key)._2)
                   }
                 })
@@ -202,7 +200,7 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
     def apply(self: HBaseRDD[K, V], rightSideRddWithSortedPartitions: RDD[(K, W)]): RDD[(K, (V, W))] = {
       val broadCastConf = new SerializableWritable(self.hbaseConf)
       val tableNameAsString = self.tableNameAsString
-      val keyToBytes = self.keyToBytes
+      val keyToBytes = self.toBytes
       rightSideRddWithSortedPartitions.mapPartitionsWithIndex[(K, (V, W))] { case (p, part) => {
         if (part.isEmpty) {
           Iterator.empty
@@ -282,8 +280,6 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
       val tableNameAsString = self.tableNameAsString
       val multiGetSize = batchSize
       val multiget = HBaseRDDFunctions.this.multiget
-      val keyToBytes = self.keyToBytes
-      val bytesToKey = self.bytesToKey
       rightSideRdd.mapPartitions(part => {
         val connection = ConnectionFactory.createConnection(broadCastConf.value)
         val table = connection.getTable(TableName.valueOf(tableNameAsString))
@@ -311,13 +307,13 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
             }
             while (forward.hasNext && forward.head._2._1.isEmpty && multiGet.size < multiGetSize) {
               val (key, (leftSideValue, rightSideValue)) = forward.next
-              multiGet += keyToBytes(key)
+              multiGet += self.toBytes(key)
               bufferMap(key) = ((emptyLeftSide, rightSideValue))
             }
             if (!forward.hasNext || bufferMap.size >= multiGetSize) {
               val multiGetList = new util.ArrayList[Get]()
               multiget(self, table, multiGet).foreach(row => if (!row.isEmpty) {
-                val key = bytesToKey(row.getRow)
+                val key = self.fromBytes(row.getRow)
                 bufferMap(key) = (Some(self.resultToValue(row)), bufferMap(key)._2)
               })
 

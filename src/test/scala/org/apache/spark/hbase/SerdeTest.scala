@@ -14,18 +14,18 @@ class SerdeTest extends FlatSpec with Matchers {
   it should "be deterministic both ways" in {
     val serde = new SerdeDefault(){}
     val key = ByteUtils.parseUUID(UUID.randomUUID.toString)
-    val bytes = serde.keyToBytes(key)
+    val bytes = serde.toBytes(key)
     bytes.length should be(key.length)
-    ByteUtils.equals(serde.bytesToKey(bytes), key) should be(true)
+    ByteUtils.equals(serde.fromBytes(bytes), key) should be(true)
   }
 
   behavior of "SerdeUUID"
   it should "be deterministic both ways" in {
     val serde = new SerdeUUID(){}
     val key = UUID.randomUUID()
-    val bytes = serde.keyToBytes(key)
+    val bytes = serde.toBytes(key)
     bytes.length should be(16)
-    serde.bytesToKey(bytes) should be(key)
+    serde.fromBytes(bytes) should be(key)
   }
 
 

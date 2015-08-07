@@ -7,9 +7,9 @@ import org.apache.hadoop.hbase.client.Result
  */
 class HBaseRDDFiltered[K,V](self: HBaseRDD[K,V], filter: HBaseFilter)
   extends HBaseRDD[K,V](self.sc, self.tableNameAsString, self.filters :+ filter) {
-  override def bytesToKey: (Array[Byte]) => K = self.bytesToKey
+  override def fromBytes: (Array[Byte], Int, Int) => K = self.fromBytes
 
-  override def keyToBytes: (K) => Array[Byte] = self.keyToBytes
+  override def toBytes: (K) => Array[Byte] = self.toBytes
 
   override def resultToValue: (Result) => V = self.resultToValue
 }

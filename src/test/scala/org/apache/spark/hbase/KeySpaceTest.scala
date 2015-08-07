@@ -22,9 +22,9 @@ class KeySpaceTest extends FlatSpec with Matchers {
     new KeySpaceUUID("u").keyValue
   )
 
-  val partitioner = new RegionPartitioner[Key](numPartitions, new KeySerDe[Key] {
-    override def bytesToKey = (bytes: Array[Byte]) => Key(bytes)
-    override def keyToBytes = (key: Key) => key.bytes
+  val partitioner = new RegionPartitioner[Key](numPartitions, new Serde[Key] {
+    override def fromBytes = (bytes: Array[Byte], o: Int, l: Int) => Key(bytes)
+    override def toBytes = (key: Key) => key.bytes
   })
 
   behavior of "KeySpaceLong"

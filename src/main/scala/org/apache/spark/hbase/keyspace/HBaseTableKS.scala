@@ -13,9 +13,9 @@ import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
 class HBaseTableKS(sc: SparkContext, tableNameAsString: String)(implicit reg: KSREG)
   extends HBaseTable[Key](sc, tableNameAsString) {
 
-  override def keyToBytes: Key => Array[Byte] = (key: Key) => key.bytes
+  override def toBytes: Key => Array[Byte] = (key: Key) => key.bytes
 
-  override def bytesToKey: Array[Byte] => Key = (bytes: Array[Byte]) => Key(bytes)
+  override def fromBytes: (Array[Byte], Int, Int) => Key = (bytes: Array[Byte], o:Int, l:Int) => Key(bytes)
 
   def rdd(rowKeySpace: Short): HBaseRDDKS[Result] = {
     rdd((result: Result) => result, rowKeySpace)
@@ -23,9 +23,9 @@ class HBaseTableKS(sc: SparkContext, tableNameAsString: String)(implicit reg: KS
 
   protected def rdd[V](valueMapper: (Result) => V, rowKeySpace: Short): HBaseRDDKS[V] = {
     new HBaseRDDKS[V](sc, tableNameAsString, rowKeySpace) {
-      override def bytesToKey = HBaseTableKS.this.bytesToKey
+      override def fromBytes = HBaseTableKS.this.fromBytes
 
-      override def keyToBytes = HBaseTableKS.this.keyToBytes
+      override def toBytes = HBaseTableKS.this.toBytes
 
       override def resultToValue = valueMapper
     }

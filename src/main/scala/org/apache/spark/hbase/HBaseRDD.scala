@@ -16,7 +16,7 @@ import scala.reflect.ClassTag
 
 abstract class HBaseRDD[K, V](@transient val sc: SparkContext
                               , val tableNameAsString: String
-                              , val filters: Seq[HBaseFilter]) extends RDD[(K, V)](sc, Nil) with KeySerDe[K] {
+                              , val filters: Seq[HBaseFilter]) extends RDD[(K, V)](sc, Nil) with Serde[K] {
 
   @transient private val tableName = TableName.valueOf(tableNameAsString)
   @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
@@ -77,7 +77,7 @@ abstract class HBaseRDD[K, V](@transient val sc: SparkContext
             connection.close
             false
           } else {
-            current = Some((bytesToKey(result.getRow), resultToValue(result)))
+            current = Some((fromBytes(result.getRow), resultToValue(result)))
             true
           }
         } else {
