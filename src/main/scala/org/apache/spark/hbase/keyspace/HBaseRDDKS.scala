@@ -3,9 +3,10 @@ package org.apache.spark.hbase.keyspace
 import org.apache.hadoop.hbase.filter.FuzzyRowFilter
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
-import org.apache.spark.hbase.{HBaseQuery, HBaseFilter, HBaseRDD}
+import org.apache.spark.hbase.{HBaseRDDFunctions, HBaseQuery, HBaseFilter, HBaseRDD}
 
 import scala.collection.JavaConverters._
+import scala.reflect.ClassTag
 
 
 /**

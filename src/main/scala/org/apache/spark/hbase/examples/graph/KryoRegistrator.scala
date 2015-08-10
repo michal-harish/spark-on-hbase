@@ -11,6 +11,6 @@ class KryoRegistrator extends org.apache.spark.serializer.KryoRegistrator {
     kryo.register(classOf[KeySpaceLong])
     kryo.register(classOf[KeySpaceString])
     kryo.register(classOf[Key])
-    kryo.register(classOf[HE])
+    kryo.register(classOf[EP])
   }
 }
