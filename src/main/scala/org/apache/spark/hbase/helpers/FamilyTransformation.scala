@@ -9,32 +9,15 @@ import org.apache.spark.hbase.{Serde, HBaseQuery, Transformation}
 /**
  * Created by mharis on 06/08/15.
  */
-object FamilyTransformation {
+case class TStringDouble(cf: String) extends FamilyTransformationCase(cf, new SerdeString() {}, new SerdeDouble() {})
 
-  def StringDouble(cf: String) = FamilyTransformation(cf, new SerdeString() {}, new SerdeDouble() {})
+case class TStringInt(cf: String) extends FamilyTransformationCase(cf, new SerdeString() {}, new SerdeInt() {})
 
-  def StringInt(cf: String) = FamilyTransformation(cf, new SerdeString() {}, new SerdeInt() {})
+case class TStringLong(cf: String) extends FamilyTransformationCase(cf, new SerdeString() {}, new SerdeLong() {})
 
-  def StringLong(cf: String) = FamilyTransformation(cf, new SerdeString() {}, new SerdeLong() {})
-
-  def StringNull(cf: String) = FamilyTransformation(cf, new SerdeString() {}, new SerdeNull() {})
-
-  def apply[K,V](cf: String, serde1: Serde[K], serde2: Serde[V] ) = new FamilyTransformation[K,V](cf) {
-
-    override def applyCell(cell: Cell): (K, V) = {
-      val key = serde1.fromBytes(cell.getQualifierArray, cell.getQualifierOffset, cell.getQualifierLength)
-      val value = serde2.fromBytes(cell.getValueArray, cell.getValueOffset, cell.getValueLength)
-      (key, value)
-    }
-
-    override def applyCellInverse(key: K, value: V): (Array[Byte], Array[Byte]) = {
-      (serde1.toBytes(key), serde2.toBytes(value))
-    }
-  }
-}
+case class TStringNull(cf: String) extends FamilyTransformationCase(cf, new SerdeString() {}, new SerdeNull() {})
 
 abstract class FamilyTransformation[K, V](private val cf: String) extends Transformation[Map[K, V]](cf) {
-
 
   val family: Array[Byte] = Bytes.toBytes(cf)
 
@@ -82,4 +65,16 @@ abstract class FamilyTransformation[K, V](private val cf: String) extends Transf
     }
   }
 
+}
+
+class FamilyTransformationCase[K, V](cf: String, serde1: Serde[K], serde2: Serde[V]) extends FamilyTransformation[K, V](cf) {
+  override def applyCell(cell: Cell): (K, V) = {
+    val key = serde1.fromBytes(cell.getQualifierArray, cell.getQualifierOffset, cell.getQualifierLength)
+    val value = serde2.fromBytes(cell.getValueArray, cell.getValueOffset, cell.getValueLength)
+    (key, value)
+  }
+
+  override def applyCellInverse(key: K, value: V): (Array[Byte], Array[Byte]) = {
+    (serde1.toBytes(key), serde2.toBytes(value))
+  }
 }

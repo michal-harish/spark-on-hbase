@@ -35,10 +35,10 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String)
 
 
   //predefined column family transformation can be declared for shorthand
-  val Features = FamilyTransformation.StringLong("F")
+  val Features = TStringLong("F")
   //using predefined transformations can be done inline - see DemoSimpleApp - e.g. TDouble("F:propensity")
 
-  val Scores = FamilyTransformation.StringDouble("S")
+  val Scores = TStringDouble("S")
 
   //custom transformation over multiple column families
   val CellCount = new Transformation[Short]("T", "F", "S") {
@@ -54,7 +54,7 @@ class HBaseTableSimple(sc: SparkContext, tableNameAsString: String)
 
   //custom tansformation of columnfamily transformation nested, i.e. we don't use the value form T column family so Set is nicer
   val Tags = new Transformation[Set[String]]("T") {
-    val cfTransformation = FamilyTransformation.StringNull("T")
+    val cfTransformation = TStringNull("T")
 
     def contains(tag: String) = cfTransformation.contains(tag)
 
