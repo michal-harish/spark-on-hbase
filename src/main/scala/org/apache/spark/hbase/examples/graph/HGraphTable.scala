@@ -3,13 +3,14 @@ package org.apache.spark.hbase.examples.graph
 import java.io.{BufferedWriter, OutputStreamWriter}
 
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.hadoop.hbase.client.{Consistency, Result}
+import org.apache.hadoop.hbase.client.{Put, Consistency, Result}
 import org.apache.hadoop.hbase.HConstants._
 import org.apache.hadoop.hbase.io.compress.Compression.Algorithm
 import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{Cell, CellUtil, HConstants}
 import org.apache.spark.hbase._
+import org.apache.spark.hbase.helpers.FamilyTransformation
 import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
 import org.apache.spark.hbase.keyspace.{HBaseTableKS, Key, KeySpace}
 import org.apache.spark.rdd.RDD
@@ -105,26 +106,32 @@ with AGraph[HE] {
 
   type STATS = LinkedHashMap[String, Accumulator[Long]]
 
+  val Edges = new Transformation[Seq[EDGE]]("N") {
+    val N = Bytes.toBytes("N")
+    override def apply(result: Result): Seq[(Key, HE)] = {
+      val edgeSeqBuilder = Seq.newBuilder[(Key, HE)]
+      val scanner = result.cellScanner
+      val cfNet = Bytes.toBytes("N")
+      while (scanner.advance) {
+        val kv = scanner.current
+        if (Bytes.equals(kv.getFamilyArray, kv.getFamilyOffset, kv.getFamilyLength, cfNet, 0, cfNet.length)) {
+          val key = Key(CellUtil.cloneQualifier(kv))
+          val ts = kv.getTimestamp
+          edgeSeqBuilder += ((key, HE.applyVersion(CellUtil.cloneValue(kv), ts)))
+        }
+      }
+      edgeSeqBuilder.result
+    }
+    override def applyInverse(edges: Seq[EDGE], mutation: Put) = {
+       edges.foreach{ case (dest: Key, props :HE) => {
+          mutation.addColumn(N, toBytes(dest), props.ts, props.bytes)
+       }}
+    }
+  }
 
   @transient
   val propsFile = new Path(s"/hgraph/${tableName}") //TODO configurable path for hgraph properties
   val props = scala.collection.mutable.LinkedHashMap[String, String]()
-
-  //TODO Transformation[Seq[EDGE]]
-  val CFREdges = (row: Result) => {
-    val edgeSeqBuilder = Seq.newBuilder[(Key, HE)]
-    val scanner = row.cellScanner
-    val cfNet = Bytes.toBytes("N")
-    while (scanner.advance) {
-      val kv = scanner.current
-      if (Bytes.equals(kv.getFamilyArray, kv.getFamilyOffset, kv.getFamilyLength, cfNet, 0, cfNet.length)) {
-        val key = Key(CellUtil.cloneQualifier(kv))
-        val ts = kv.getTimestamp
-        edgeSeqBuilder += ((key, HE.applyVersion(CellUtil.cloneValue(kv), ts)))
-      }
-    }
-    edgeSeqBuilder.result
-  }
 
   def start_date = props("start_date")
 

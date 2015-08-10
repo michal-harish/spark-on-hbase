@@ -224,6 +224,7 @@ You can then run the demo appliation as a shell:
 `./scripts/demo-graph-shell`
 
 # TODOs
+- TTL on a per-mutation basis
 - fixme: update on HBaseTable task size is 250k - something unnecessary is getting serialised
 - fixme: warning: there were 1 deprecation warning(s); re-run with -deprecation for details
 - spark-submit script and add an example into the simple demo

@@ -17,6 +17,7 @@ import org.apache.spark.hbase.HBaseRDD.hBaseRddToPairRDDFunctions
 import org.apache.spark.{SerializableWritable, SparkContext}
 
 import scala.reflect.ClassTag
+import scala.collection.JavaConverters._
 
 /**
  * Created by mharis on 27/07/15.
@@ -228,7 +229,24 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
     }
   }
 
-  //TODO bulkUpdate[V](f: Transformation[V], u: RDD[(K, V)])(implicit v: ClassTag[V], k: ClassTag[K])
+  def bulkUpdate[V](f: Transformation[V], u: RDD[(K, V)], completeAsync: Boolean)(implicit v: ClassTag[V], k: ClassTag[K]): Long = {
+    val acc = sc.accumulator(0L, s"HBATable ${tableName} update count")
+    implicit val keyValueOrdering = KeyValueOrdering
+    val hfileRdd: RDD[(ImmutableBytesWritable, KeyValue)] = u.flatMap { case (key, value) => {
+      val keyBytes = toBytes(key)
+      val put = new Put(keyBytes)
+      f.applyInverse(value, put)
+      put.getFamilyCellMap.values.iterator.asScala.flatMap(_.asScala.map { cell => (new KeyValue(cell), keyBytes) })
+    }
+    }.repartitionAndSortWithinPartitions(partitioner).map { case (keyValue, rowKey) => {
+      acc += 1L
+      (new ImmutableBytesWritable(rowKey), keyValue)
+    }
+    }.setName(s"HFileRDD PUT (${tableName})")
+
+    bulk(hfileRdd, completeAsync)
+    acc.value
+  }
 
   def bulkLoad(family: Array[Byte], bulkRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])], completeAsync: Boolean): Long = {
     val acc = sc.accumulator(0L, s"HBATable ${tableName} load count")
