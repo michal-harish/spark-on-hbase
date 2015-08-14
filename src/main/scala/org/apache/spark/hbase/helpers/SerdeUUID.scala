@@ -2,7 +2,8 @@ package org.apache.spark.hbase.helpers
 
 import java.util.UUID
 
-import org.apache.spark.hbase.{ByteUtils, Serde}
+import org.apache.spark.hbase.Serde
+import org.apache.spark.hbase.misc.ByteUtils
 
 /**
  * Created by mharis on 06/08/15.

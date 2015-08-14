@@ -1,7 +1,7 @@
 package org.apache.spark.hbase.examples.graph
 
-import org.apache.spark.hbase.ByteUtils
 import org.apache.spark.hbase.keyspace.{KeySpace, KeySerdeUUIDNumeric}
+import org.apache.spark.hbase.misc.ByteUtils
 
 /**
  * Created by mharis on 23/07/15.

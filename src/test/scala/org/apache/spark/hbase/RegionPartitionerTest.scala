@@ -4,6 +4,7 @@ import java.util.UUID
 
 import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
 import org.apache.spark.hbase.keyspace._
+import org.apache.spark.hbase.misc.ByteUtils
 import org.scalatest.{FlatSpec, Matchers}
 
 /**

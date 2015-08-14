@@ -8,6 +8,7 @@ import org.apache.hadoop.hbase.regionserver.BloomType
 import org.apache.spark.SparkContext
 import org.apache.spark.hbase._
 import org.apache.spark.hbase.helpers._
+import org.apache.spark.hbase.misc.HBaseAdminUtils
 
 /**
  * Created by mharis on 27/07/15.
@@ -20,11 +21,11 @@ import org.apache.spark.hbase.helpers._
 object HBaseTableSimple {
 
   val schema = Seq(
-    Utils.column("T", inMemory = false, ttlSeconds = 86400 * 90, BloomType.ROW,
+    HBaseAdminUtils.column("T", inMemory = false, ttlSeconds = 86400 * 90, BloomType.ROW,
       maxVersions = 1, Algorithm.SNAPPY, blocksize = 64 * 1024),
-    Utils.column("F", inMemory = false, ttlSeconds = 86400 * 90, BloomType.ROWCOL,
+    HBaseAdminUtils.column("F", inMemory = false, ttlSeconds = 86400 * 90, BloomType.ROWCOL,
       maxVersions = 1, Algorithm.SNAPPY, blocksize = 64 * 1024),
-    Utils.column("S", inMemory = false, ttlSeconds = 86400 * 90, BloomType.ROWCOL,
+    HBaseAdminUtils.column("S", inMemory = false, ttlSeconds = 86400 * 90, BloomType.ROWCOL,
       maxVersions = 1, Algorithm.SNAPPY, blocksize = 64 * 1024)
   )
 

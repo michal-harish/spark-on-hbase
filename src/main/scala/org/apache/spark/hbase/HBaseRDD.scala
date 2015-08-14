@@ -6,6 +6,7 @@ import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
 import org.apache.spark._
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.hbase.helpers.SerdeDefault
+import org.apache.spark.hbase.misc.HBaseAdminUtils
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
@@ -19,9 +20,9 @@ abstract class HBaseRDD[K, V](@transient val sc: SparkContext
                               , val filters: Seq[HBaseFilter]) extends RDD[(K, V)](sc, Nil) with Serde[K] {
 
   @transient private val tableName = TableName.valueOf(tableNameAsString)
-  @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
+  @transient val hbaseConf: Configuration = HBaseAdminUtils.initConfig(sc, HBaseConfiguration.create)
   protected val configuration = new SerializableWritable(hbaseConf)
-  protected val regionSplits: Array[(Array[Byte], Array[Byte])] = Utils.getRegionSplits(hbaseConf, tableName)
+  protected val regionSplits: Array[(Array[Byte], Array[Byte])] = HBaseAdminUtils.getRegionSplits(hbaseConf, tableName)
   @transient override val partitioner: Option[Partitioner] = Some(new RegionPartitioner(regionSplits.size, this))
 
   def resultToValue: Result => V

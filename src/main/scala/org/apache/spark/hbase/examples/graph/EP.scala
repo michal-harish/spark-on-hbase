@@ -1,8 +1,8 @@
 package org.apache.spark.hbase.examples.graph
 
 import org.apache.hadoop.hbase.HConstants
-import org.apache.spark.hbase.ByteUtils
 import org.apache.spark.hbase.keyspace.Key
+import org.apache.spark.hbase.misc.ByteUtils
 
 /**
  * Created by mharis on 26/07/15.

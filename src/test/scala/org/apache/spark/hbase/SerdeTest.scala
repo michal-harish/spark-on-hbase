@@ -3,6 +3,7 @@ package org.apache.spark.hbase
 import java.util.UUID
 
 import org.apache.spark.hbase.helpers.{SerdeDefault, SerdeUUID}
+import org.apache.spark.hbase.misc.ByteUtils
 import org.scalatest.{Matchers, FlatSpec}
 
 /**

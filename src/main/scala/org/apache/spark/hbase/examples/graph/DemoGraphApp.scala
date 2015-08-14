@@ -2,6 +2,7 @@ package org.apache.spark.hbase.examples.graph
 
 import org.apache.hadoop.hbase.client.{Put, ConnectionFactory, Durability}
 import org.apache.hadoop.hbase.{HBaseConfiguration, TableName}
+import org.apache.spark.hbase.misc.HBaseAdminUtils
 import org.apache.spark.{SerializableWritable, SparkContext}
 import org.apache.spark.hbase._
 import org.apache.spark.hbase.keyspace._
@@ -34,7 +35,7 @@ class DemoGraphApp(sc: SparkContext) {
   }
 
   def create = {
-    Utils.updateSchema(sc, graph.tableNameAsString, numRegions = 256, graph.schema: _*)
+    HBaseAdminUtils.updateSchema(sc, graph.tableNameAsString, numRegions = 256, graph.schema: _*)
   }
 
   def generate = {

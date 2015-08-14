@@ -12,6 +12,7 @@ import org.apache.hadoop.hbase.mapreduce.{HFileOutputFormat2, LoadIncrementalHFi
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.mapreduce.Job
 import org.apache.hadoop.mapreduce.lib.partition.TotalOrderPartitioner
+import org.apache.spark.hbase.misc.HBaseAdminUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.hbase.HBaseRDD.hBaseRddToPairRDDFunctions
 import org.apache.spark.{SerializableWritable, SparkContext}
@@ -34,6 +35,7 @@ import scala.collection.JavaConverters._
  * .increment
  * .delete
  * ------------ bulk operations:
+ * .bulkUpdate
  * .bulkLoad
  * .bulkDelete
  */
@@ -42,11 +44,11 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   type HBaseResultFunction[X] = Function[Result, X]
 
-  @transient val hbaseConf: Configuration = Utils.initConfig(sc, HBaseConfiguration.create)
+  @transient val hbaseConf: Configuration = HBaseAdminUtils.initConfig(sc, HBaseConfiguration.create)
 
   @transient val tableName = TableName.valueOf(tableNameAsString)
 
-  val numberOfRegions = Utils.getNumberOfRegions(hbaseConf, tableNameAsString)
+  val numberOfRegions = HBaseAdminUtils.getNumberOfRegions(hbaseConf, tableNameAsString)
 
   @transient val partitioner = new RegionPartitioner(numberOfRegions, this)
 
@@ -214,7 +216,7 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
    * - requires the job/shell to be run us hbase user
    * - completeAsync - tells the job to complete the incremental load in the background or do it synchronously
    */
-  val KeyValueOrdering = new Ordering[KeyValue] {
+  implicit val KeyValueOrdering = new Ordering[KeyValue] {
     override def compare(a: KeyValue, b: KeyValue) = {
       Bytes.compareTo(a.getRowArray, a.getRowOffset, a.getRowLength, b.getRowArray, b.getRowOffset, b.getRowLength) match {
         case 0 => Bytes.compareTo(a.getFamilyArray, a.getFamilyOffset, a.getFamilyLength, b.getFamilyArray, b.getFamilyOffset, b.getFamilyLength) match {
@@ -231,7 +233,6 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   def bulkUpdate[V](f: Transformation[V], u: RDD[(K, V)], completeAsync: Boolean)(implicit v: ClassTag[V], k: ClassTag[K]): Long = {
     val acc = sc.accumulator(0L, s"HBATable ${tableName} update count")
-    implicit val keyValueOrdering = KeyValueOrdering
     val hfileRdd: RDD[(ImmutableBytesWritable, KeyValue)] = u.flatMap { case (key, value) => {
       val keyBytes = toBytes(key)
       val put = new Put(keyBytes)
@@ -250,11 +251,8 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   def bulkLoad(family: Array[Byte], bulkRdd: RDD[(K, Map[Array[Byte], (Array[Byte], Long)])], completeAsync: Boolean): Long = {
     val acc = sc.accumulator(0L, s"HBATable ${tableName} load count")
-    val keyToBytes = this.toBytes
-    implicit val keyValueOrdering = KeyValueOrdering
-
     val hfileRdd: RDD[(ImmutableBytesWritable, KeyValue)] = bulkRdd.flatMap { case (key, columnVersions) => {
-      val keyBytes = keyToBytes(key)
+      val keyBytes = toBytes(key)
       columnVersions.map { case (qualifier, (value, timestamp)) => {
         (new KeyValue(keyBytes, family, qualifier, timestamp, KeyValue.Type.Put, value), keyBytes)
       }
@@ -272,12 +270,10 @@ abstract class HBaseTable[K](@transient protected val sc: SparkContext, val tabl
 
   def bulkDelete(family: Array[Byte], deleteRdd: RDD[(K, Seq[Array[Byte]])], completeAsync: Boolean): Long = {
     val acc = sc.accumulator(0L, s"HBATable ${tableName} delete count")
-    val cfs = Utils.getColumnFamilies(hbaseConf, tableNameAsString).map(_.getName)
-    val keyToBytes = this.toBytes
-    implicit val keyValueOrdering = KeyValueOrdering
+    val cfs = HBaseAdminUtils.getColumnFamilies(hbaseConf, tableNameAsString).map(_.getName)
 
     val hFileRdd: RDD[(ImmutableBytesWritable, KeyValue)] = deleteRdd.flatMap { case (key, qualifiersToDelete) => {
-      val keyBytes = keyToBytes(key)
+      val keyBytes = toBytes(key)
       if (qualifiersToDelete.contains(null)) cfs.map(cf => {
         (new KeyValue(keyBytes, cf, null, HConstants.LATEST_TIMESTAMP, KeyValue.Type.DeleteFamily), keyBytes)
       })

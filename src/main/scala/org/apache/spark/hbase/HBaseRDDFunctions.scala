@@ -7,6 +7,7 @@ import org.apache.hadoop.hbase.filter._
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.hadoop.hbase.{HConstants, TableName}
 import org.apache.spark.hbase.helpers.TransformationFilter
+import org.apache.spark.hbase.misc.ByteUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Partitioner, SerializableWritable}
 
@@ -342,3 +343,4 @@ class HBaseRDDFunctions[K, V](self: HBaseRDD[K, V])(implicit vk: ClassTag[K], vt
   }
 
 }
+

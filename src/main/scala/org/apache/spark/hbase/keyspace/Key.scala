@@ -1,7 +1,7 @@
 package org.apache.spark.hbase.keyspace
 
-import org.apache.spark.hbase.ByteUtils
 import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
+import org.apache.spark.hbase.misc.ByteUtils
 
 class Key(val keySpace: Short, val bytes: Array[Byte], val hash: Int)(implicit reg: KSREG)
 extends Serializable with Ordered[Key] {

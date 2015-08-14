@@ -9,6 +9,7 @@ import org.apache.hadoop.hbase.{Cell, CellUtil}
 import org.apache.spark.hbase._
 import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
 import org.apache.spark.hbase.keyspace.{HBaseTableKS, Key, KeySpace}
+import org.apache.spark.hbase.misc.HBaseAdminUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{Accumulator, SparkContext}
 
@@ -20,8 +21,8 @@ with AGraph[EP] {
 
   @transient
   val schema = List(
-    Utils.column("N", true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
-    , Utils.column("E", true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024))
+    HBaseAdminUtils.column("N", true, 86400 * 360, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024)
+    , HBaseAdminUtils.column("E", true, 86400 * 30, BloomType.ROW, 1, Algorithm.SNAPPY, 32 * 1024))
 
   type STATS = LinkedHashMap[String, Accumulator[Long]]
 
@@ -91,7 +92,8 @@ with AGraph[EP] {
    */
   def rddPool(keySpace: String): POOL = rdd(KeySpace(keySpace), MaxConnected(keySpace)).select("N")
 
-  //TODO select(MaxConnected(keySpace)).filter(KeySpace(keySpace))
+  //TODO this.rdd.filter(KeySpace(keySpace)).select(MaxConnected(keySpace))
+  //OR this.select(MaxConnected(keySpace)).filter(KeySpace(keySpace))
 
   /**
    * rddNet is the RDD representation of the underlying hbase state of the N (NETWORK) column family

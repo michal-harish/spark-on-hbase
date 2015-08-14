@@ -1,4 +1,4 @@
-package org.apache.spark.hbase;
+package org.apache.spark.hbase.misc;
 
 public class ByteUtils {
 

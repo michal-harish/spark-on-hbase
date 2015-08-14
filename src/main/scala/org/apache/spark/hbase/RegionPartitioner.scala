@@ -7,6 +7,7 @@ package org.apache.spark.hbase
 import org.apache.hadoop.hbase.KeyValue
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.Partitioner
+import org.apache.spark.hbase.misc.ByteUtils
 
 class RegionPartitioner[K](val numRegions: Int, private val kt: Serde[K]) extends Partitioner {
 

@@ -1,7 +1,7 @@
 package org.apache.spark.hbase.keyspace
 
-import org.apache.spark.hbase.ByteUtils
 import org.apache.spark.hbase.keyspace.KeySpaceRegistry.KSREG
+import org.apache.spark.hbase.misc.ByteUtils
 
 package object KeySpaceRegistry {
   type KSREG = Map[Short, KeySpace]

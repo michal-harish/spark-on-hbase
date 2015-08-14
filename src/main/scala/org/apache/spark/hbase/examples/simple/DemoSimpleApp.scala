@@ -3,8 +3,8 @@ package org.apache.spark.hbase.examples.simple
 import java.util.UUID
 
 import org.apache.spark.SparkContext
-import org.apache.spark.hbase.Utils
 import org.apache.spark.hbase.helpers.TLong
+import org.apache.spark.hbase.misc.HBaseAdminUtils
 import org.apache.spark.rdd.RDD
 
 import scala.util.Random
@@ -17,7 +17,7 @@ class DemoSimpleApp(sc: SparkContext) {
 
   implicit val context = sc
 
-  Utils.updateSchema(sc, "demo-simple", numRegions = 32, HBaseTableSimple.schema: _*)
+  HBaseAdminUtils.updateSchema(sc, "demo-simple", numRegions = 32, HBaseTableSimple.schema: _*)
 
   val table = new HBaseTableSimple(sc: SparkContext, "demo-simple")
 
@@ -25,7 +25,8 @@ class DemoSimpleApp(sc: SparkContext) {
     println("Spark-on-HBase Simple Demo shell help:")
     println(" help - print this usage information")
     println(" table - main example instance of the HBaseTableSimple `demo-simple`")
-    println(" generate  - put 1000 random rows into the underlying hbase table `demo-simple` using Transformation")
+    println(" update  - put 1000 random rows into the underlying hbase table `demo-simple` using Transformation")
+    println(" bulkUpdate - put 1000 random rows into the underlying hbase table `demo-simple` using Transformation and bulk operation")
     println(" collect - collect all data from the demo table")
     println(" collectNumCells - count number of cells per row in a specialised HBaseRDD[String, Short]")
     println(" collectFeatures - collect column family F from the demo table and map it to specialised HBaseRDD[String, Map[String,Long]]")
@@ -36,23 +37,30 @@ class DemoSimpleApp(sc: SparkContext) {
     println(" filter - example transformation filter")
   }
 
-  def generate = {
-
+  def generate: RDD[(UUID, Map[String, Long], Set[String])] = {
     val r = new Random
     val possibleTags = Set("lego", "music", "cars", "cinema", "sport")
-
-    val data: RDD[(UUID, Map[String, Long], Set[String])] = sc.parallelize(for (i <- (1 to 1000)) yield {
+    sc.parallelize(for (i <- (1 to 1000)) yield {
       (UUID.randomUUID(),
         Map("width" -> ((r.nextGaussian * 50) + 1000).toLong, "height" -> ((r.nextGaussian * 50) + 1000).toLong),
         possibleTags.filter(x => r.nextBoolean))
     })
+  }
 
+  def update = {
+    val data = generate
     println("Updating `demo-simple` column family `F` - Features")
     table.update(table.Features, data.map { case (key, features, tags) => (key, features) })
-
     println("Updating `demo-simple` column family `T` - Tags")
     table.update(table.Tags, data.map { case (key, features, tags) => (key, tags) })
+  }
 
+  def bulkUpdate = {
+    val data = generate
+    println("Bulk-Updating `demo-simple` column family `F` - Features")
+    table.bulkUpdate(table.Features, data.map { case (key, features, tags) => (key, features) }, true)
+    println("Bulk-Updating `demo-simple` column family `T` - Tags")
+    table.bulkUpdate(table.Tags, data.map { case (key, features, tags) => (key, tags) }, true)
   }
 
   def collect = {

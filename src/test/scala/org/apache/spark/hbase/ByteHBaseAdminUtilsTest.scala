@@ -1,11 +1,12 @@
 package org.apache.spark.hbase
 
+import org.apache.spark.hbase.misc.ByteUtils
 import org.scalatest.{FlatSpec, Matchers}
 
 /**
  * Created by mharis on 31/07/15.
  */
-class ByteUtilsTest extends FlatSpec with Matchers {
+class ByteHBaseAdminUtilsTest extends FlatSpec with Matchers {
 
   behavior of "Hexadecimal conversions"
   it should "be correctly reverse bytes to the original hexadecimal" in {
